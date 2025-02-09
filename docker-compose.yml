@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:latest
+    container_name: sso-postgres
+    environment:
+      - POSTGRES_USER=sso
+      - POSTGRES_PASSWORD=sso
+      - POSTGRES_DB=sso
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/db/pg/data:/var/lib/postgresql/data
+    networks:
+      - sso
+
+volumes:
+  sso:
+    driver: local
+
+networks:
+  sso:
+    driver: bridge
