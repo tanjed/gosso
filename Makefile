@@ -2,5 +2,8 @@
 GO = go
 
 # Run the Go application
-run-dev:
+serve:
 	$(GO) run cmd/server/main.go
+
+migrate :
+	$(GO) run cmd/migration/main.go

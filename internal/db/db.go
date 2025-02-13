@@ -1,20 +1,34 @@
 package db
 
 import (
+	"github.com/jackc/pgx/v5"
 	"github.com/tanjed/go-sso/internal/config"
 )
 
 const DB_DRIVER_POSTGRES = "postgres"
 
-var DB interface{}
+type DB struct {
+	Conn *pgx.Conn
+}
 
-func Init() {
-	config := config.AppConfig
-
-	switch config.DB_DRIVER {
+func Init() DB{
+	var db DB
+	switch config.AppConfig.DB_DRIVER {
 	case DB_DRIVER_POSTGRES :
-		DB = InitPg(&config)
+		db.Conn = initPg(&config.AppConfig)
 	default:
-		DB = InitPg(&config)
+		db.Conn = initPg(&config.AppConfig)
+	}
+
+	return db
+}
+
+func (db *DB) Close() {
+	switch config.AppConfig.DB_DRIVER {
+	case DB_DRIVER_POSTGRES :
+		closePg(db.Conn)
+		
+	default:
+		closePg(db.Conn)
 	}
 }

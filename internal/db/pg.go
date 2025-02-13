@@ -1,28 +1,27 @@
 package db
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"log"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 	"github.com/tanjed/go-sso/internal/config"
 )
 
-func InitPg(config *config.Config) interface{} {
-	
-	db, err := sql.Open("postgres", getPgConnectionString(config))
+func initPg(config *config.Config) *pgx.Conn {
+
+	db, err := pgx.Connect(context.Background(), getPgConnectionString(config))
 
 	if err != nil {
 		log.Fatalf("Error opening the database: %v", err)
 	}
 	
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("Error pinging the database: %v", err)
-	}
-
 	return db
+}
+
+func closePg(db *pgx.Conn) {
+	db.Close(context.Background())
 }
 
 func getPgConnectionString (config *config.Config) string {

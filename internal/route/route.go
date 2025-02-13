@@ -7,8 +7,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func Load() {
-	r := mux.NewRouter().PathPrefix("v1")
+func Load() *mux.Router {
+	r := mux.NewRouter()
 	v1 := r.PathPrefix("/v1").Subrouter()
 
 	loadV1Routes(v1)
@@ -23,4 +23,6 @@ func Load() {
 	v1.MethodNotAllowedHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 	})
+
+	return r
 }

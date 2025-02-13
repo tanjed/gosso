@@ -11,10 +11,13 @@ import (
 
 func main() {
 	config.Load()
-	db.Init()
-	route.Load()
 
-	if err:= http.ListenAndServe(":" + config.AppConfig.Port, nil); err != nil {
+	db := db.Init()
+	db.Close()
+
+	router := route.Load()
+
+	if err:= http.ListenAndServe(":" + config.AppConfig.Port, router); err != nil {
 		log.Fatalf("Server failed to start %s", err)
 	}
 }
