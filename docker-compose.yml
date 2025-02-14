@@ -1,22 +1,42 @@
+version: "3.8"
+
 services:
-  db:
-    image: postgres:latest
-    container_name: sso-postgres
-    environment:
-      - POSTGRES_USER=sso
-      - POSTGRES_PASSWORD=sso
-      - POSTGRES_DB=sso
+  cassandra:
+    image: cassandra:3.11
+    container_name: cassandra
     ports:
-      - "5432:5432"
+      - "9042:9042" # Expose Cassandra's default port (CQL)
+    environment:
+      - CASSANDRA_CLUSTER_NAME=sso
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_LISTENER_INTERFACE=eth0
+      - CASSANDRA_LISTENER_RPC_ADDRESS=0.0.0.0
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra
+      - CASSANDRA_RPC_ADDRESS=0.0.0.0
+      - CASSANDRA_AUTHENTICATOR=PasswordAuthenticator
+      - CASSANDRA_AUTHORIZATION=CassandraAuthorizer
+      - CASSANDRA_PASSWORD="sso"
+      - CASSANDRA_USER="sso"
     volumes:
-      - ./docker/db/pg/data:/var/lib/postgresql/data
+      - ./docker/db/cassandra/data:/var/lib/cassandra
     networks:
-      - sso
+      - cassandra-network
+
+  # Optional: a client to interact with Cassandra, like cqlsh
+  cqlsh:
+    image: cassandra:3.11
+    container_name: cqlsh
+    command: cqlsh cassandra 9042
+    depends_on:
+      - cassandra
+    networks:
+      - cassandra-network
 
 volumes:
-  sso:
+  cassandra-data:
     driver: local
 
 networks:
-  sso:
+  cassandra-network:
     driver: bridge

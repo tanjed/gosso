@@ -27,6 +27,16 @@ func ResponseUnprocessableEntity(w *http.ResponseWriter, message string) {
 }
 
 
+func ResponseServerError(w *http.ResponseWriter, message string) {
+	responseWriter := *w
+	responseWriter.Header().Set("Content-Type", "application/json")
+	responseWriter.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(responseWriter).Encode(map[string]interface{}{
+		"errors" : message,
+	})
+}
+
+
 func ResponseUnAuthorized(w *http.ResponseWriter, message string) {
 	responseWriter := *w
 	responseWriter.Header().Set("Content-Type", "application/json")

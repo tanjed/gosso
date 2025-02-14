@@ -1,11 +1,8 @@
 {
-  "PORT": "8081",
-  "DB_HOST": "localhost",
-  "DB_PORT": "5432",
+  "PORT": "8080",
+  "DB_HOST": "127.0.0.1",
+  "DB_PORT": 9042,
   "DB_USER": "sso",
   "DB_PASSWORD": "sso",
-  "DB_NAME": "sso",
-  "DB_DRIVER": "postgres",
-  "SECRET_KEY": "super-secret-key",
-  "JWT_SECRET_KEY": "super-jwt-secret-key"
+  "DB_NAME": "sso"
 }

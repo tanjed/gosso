@@ -9,7 +9,7 @@ import (
 type Config struct {
 	Port string `json:"PORT"`
 	DB_HOST string `json:"DB_HOST"`
-	DB_PORT string `json:"DB_PORT"`
+	DB_PORT int `json:"DB_PORT"`
 	DB_USER string `json:"DB_USER"`
 	DB_PASSWORD string `json:"DB_PASSWORD"`
 	DB_NAME string `json:"DB_NAME"`

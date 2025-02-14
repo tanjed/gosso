@@ -1,0 +1,13 @@
+[build]
+  cmd = "go run cmd/server/main.go"    # Specify the correct entry point for the app
+  bin = "tmp/main"                     # Path for the compiled binary
+  watch_dir = "."                      # Directory to watch for changes
+  ignore = ["\\.git", "\\.idea", "vendor/", "docker/"]  # Ignore these directories
+
+[watch]
+  dirs = ["."]
+  exclude = ["vendor", "docker"]      # Exclude these directories from being watched
+
+[log]
+  time = true
+  color = true

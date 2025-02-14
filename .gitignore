@@ -1,1 +1,3 @@
-docker/db/pg/data/*
+docker/db/pg/data
+docker/db/cassandra/data
+tmp

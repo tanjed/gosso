@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/gocql/gocql"
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
 )
@@ -42,11 +43,35 @@ func AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
     }
-
-	if !model.AuthenticateClient(authenticationRequest.ClientName, authenticationRequest.ClientSecret) {
+	
+	client, err := model.AuthenticateClient(authenticationRequest.ClientName, authenticationRequest.ClientSecret);
+	if err != nil {
 		responsemanager.ResponseUnAuthorized(&w, "Invalid client credentials")
 		return
 	}
 
-	responsemanager.ResponseOK(&w, "User created successfully!")
+	if _, err := model.AutheticateUser(authenticationRequest.MobileNumber, authenticationRequest.Password); err != nil  {
+		responsemanager.ResponseUnAuthorized(&w, "Invalid user credentials")
+		return
+	}
+
+	clientAuthorizationCode, err := model.ClientHasValidSession(client.ClientId, authenticationRequest.RedirectUri)
+	if err != nil {
+		if err != gocql.ErrNotFound{
+			responsemanager.ResponseServerError(&w, "Something went wrong")
+			return
+		} 
+		
+		clientAuthorizationCode, err = model.NewClientAuthorizationCode(client.ClientId, authenticationRequest.RedirectUri)
+		if err != nil{
+			responsemanager.ResponseServerError(&w, "Something went wrong")
+			return
+		} 
+	}
+
+	responsemanager.ResponseOK(&w, map[string]interface{}{
+		"code" : clientAuthorizationCode.ClientCode,
+		"redirect_uri" : clientAuthorizationCode.RedirectUri,
+		"expired_at" : clientAuthorizationCode.ExpiredAt,
+	})
 }
