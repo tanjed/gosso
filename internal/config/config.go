@@ -14,6 +14,7 @@ type Config struct {
 	DB_PASSWORD string `json:"DB_PASSWORD"`
 	DB_NAME string `json:"DB_NAME"`
 	DB_DRIVER string `json:"DB_DRIVER"`
+	JWT_SECRET string `json:"JWT_SECRET"`
 }
 
 var AppConfig Config

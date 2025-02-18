@@ -4,5 +4,6 @@
   "DB_PORT": 9042,
   "DB_USER": "sso",
   "DB_PASSWORD": "sso",
-  "DB_NAME": "sso"
+  "DB_NAME": "sso",
+  "JWT_SECRET": "1234567890"
 }

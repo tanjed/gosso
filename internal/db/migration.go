@@ -40,10 +40,28 @@ func createClientAuthorizationCodesTable() {
     `
 }
 
+
+func createOauthTokenTable() {
+    migrationQueries["oauth_tokens_table_create"] = `CREATE TABLE oauth_tokens (
+    token_id TEXT,
+    client_id TEXT,
+    user_id TEXT,
+    scopes LIST<TEXT>,
+    revoked INT,
+    type TEXT,
+    expired_at TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    PRIMARY KEY((token_id, client_id, user_id), type)
+);
+`
+}
+
 func RegisterMigrationQueries() map[string]string {
 	createClientsTable()
     createUsersTable()
     createClientAuthorizationCodesTable()
+    createOauthTokenTable()
 
 	return migrationQueries
 }
