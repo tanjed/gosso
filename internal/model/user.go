@@ -76,7 +76,6 @@ func getUserByMobileNumber(mobileNumber string) *User {
 	}
 	
 	dbConn := db.InitDB()
-	defer dbConn.Close()
 	
 	err := dbConn.Conn.Query("SELECT user_id, first_name, last_name, mobile_number, password, created_at, updated_at FROM users WHERE mobile_number = ?", mobileNumber).Scan(&user.UserId,&user.FirstName, &user.LastName, &user.MobileNumber, &user.Password, &user.CreatedAt, &user.UpdatedAt)
 

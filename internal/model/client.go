@@ -84,7 +84,6 @@ func getClientByClientId(clientName string) *Client {
 	}
 
 	dbConn := db.InitDB()
-	defer dbConn.Close()
 	
 
 	err := dbConn.Conn.Query("SELECT client_id, client_name, client_secret, created_at, updated_at  FROM clients WHERE client_name = ?", clientName).
@@ -103,7 +102,6 @@ func getClientByClientId(clientName string) *Client {
 
 func ClientHasValidSession(clientId string, redirectUri string) (*clientUnAuthorizationCode, error) {
 	db := db.InitDB()
-	defer db.Close()
 	var clientAuthorizationCode clientUnAuthorizationCode
 	err := db.Conn.Query("SELECT client_id, client_code, redirect_uri, generated_at, expired_at FROM client_authorization_codes WHERE client_id = ? AND redirect_uri = ? AND expired_at > ?", clientId, redirectUri, time.Now()).
 	Scan(&clientAuthorizationCode.ClientId, &clientAuthorizationCode.ClientCode, &clientAuthorizationCode.RedirectUri, &clientAuthorizationCode.GeneratedAt, &clientAuthorizationCode.ExpiredAt)
@@ -134,7 +132,6 @@ func NewClientAuthorizationCode(clientId string, redirectUri string) (*clientUnA
 
 func insertClientAuthorizationCode(c clientUnAuthorizationCode) error {
 	db := db.InitDB()
-	defer db.Close()
 
 	return db.Conn.Query("INSERT INTO client_authorization_codes (client_id, client_code, redirect_uri, generated_at, expired_at) VALUES (?,?,?,?,?)", c.ClientId, c.ClientCode, c.RedirectUri, c.GeneratedAt, c.ExpiredAt).Exec()
 }

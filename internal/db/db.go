@@ -1,8 +1,11 @@
 package db
 
 import (
+	"fmt"
 	"log"
 	"log/slog"
+	"math/rand"
+	"sync"
 
 	"github.com/gocql/gocql"
 	"github.com/tanjed/go-sso/internal/config"
@@ -11,37 +14,48 @@ import (
 const DB_DRIVER_POSTGRES = "postgres"
 
 type DB struct {
+	Id int
 	Conn *gocql.Session
 }
 
+var dbInstance *DB
+var dbInstanceOnce sync.Once
+
 func InitDB() *DB{
-	var db DB
 
-	cluster := gocql.NewCluster(config.AppConfig.DB_HOST)
-	cluster.Port = config.AppConfig.DB_PORT
-    cluster.Keyspace = config.AppConfig.DB_NAME     
-	
-    cluster.Consistency = gocql.Quorum
-	// cluster.Timeout = 60 * time.Second  // Increase the timeout
-	// cluster.ConnectTimeout = 60 * time.Second
+	dbInstanceOnce.Do(func ()  {
+		cluster := gocql.NewCluster(config.AppConfig.DB_HOST)
+		cluster.Port = config.AppConfig.DB_PORT
+		cluster.Keyspace = config.AppConfig.DB_NAME     
+		cluster.NumConns = 500
+		cluster.Consistency = gocql.Quorum
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: config.AppConfig.DB_USER,
+			Password: config.AppConfig.DB_PASSWORD,
+		}
 
+		session, err := cluster.CreateSession()
 
-	cluster.Authenticator = gocql.PasswordAuthenticator{
-		Username: config.AppConfig.DB_USER,
-		Password: config.AppConfig.DB_PASSWORD,
+		if err != nil {
+			slog.Error("Error creating Cassandra session:", "error", err)
+		}else {
+			dbInstance = &DB{
+				Id: rand.Intn(101),
+				Conn: session,
+			}
+		}
+			
+	})
+
+	if dbInstance.Conn == nil {
+		log.Fatal("Unable to establish DB connection") 
 	}
-
-	session, err := cluster.CreateSession()
-
-	if err != nil {
-        slog.Error("Error creating Cassandra session:", "error", err)
-		log.Fatal("Exiting due to error:", err) 
-		return nil
-    }
-	db.Conn = session
-	return &db
+	fmt.Println("DB CONNECTION ID:", dbInstance.Id)
+	return dbInstance
 }
 
-func (db *DB) Close() {
-	db.Conn.Close()
+func CloseDB() {
+	if dbInstance != nil && dbInstance.Conn != nil {
+		dbInstance.Conn.Close()
+	}
 }

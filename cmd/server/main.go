@@ -18,11 +18,11 @@ import (
 func main() {
 	config.Load()
 
-	database := db.InitDB()
-	redis := db.InitRedis()
+	db.InitDB()
+	db.InitRedis()
 
-	defer database.Close()
-	defer redis.Close()
+	defer db.CloseDB()
+	defer db.CloseRedis()
 	
 	r := route.Load()
 	server := http.Server{
