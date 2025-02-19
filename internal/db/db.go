@@ -14,7 +14,7 @@ type DB struct {
 	Conn *gocql.Session
 }
 
-func Init() *DB{
+func InitDB() *DB{
 	var db DB
 
 	cluster := gocql.NewCluster(config.AppConfig.DB_HOST)

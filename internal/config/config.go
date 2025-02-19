@@ -15,6 +15,8 @@ type Config struct {
 	DB_NAME string `json:"DB_NAME"`
 	DB_DRIVER string `json:"DB_DRIVER"`
 	JWT_SECRET string `json:"JWT_SECRET"`
+	REDIS_HOST string `json:"REDIS_HOST"`
+	REDIS_PORT int `json:"REDIS_PORT"`
 }
 
 var AppConfig Config

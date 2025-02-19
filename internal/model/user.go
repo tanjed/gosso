@@ -3,9 +3,11 @@ package model
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/tanjed/go-sso/internal/db"
 	"github.com/tanjed/go-sso/pkg/hashutilities"
 )
@@ -61,14 +63,30 @@ func AutheticateUser(mobileNumber string, password string) (*User, error) {
 }
 
 func getUserByMobileNumber(mobileNumber string) *User {
-	db := db.Init()
-	defer db.Close()
 	var user User
-	err := db.Conn.Query("SELECT user_id, first_name, last_name, mobile_number, password, created_at, updated_at FROM users WHERE mobile_number = ?", mobileNumber).Scan(&user.UserId,&user.FirstName, &user.LastName, &user.MobileNumber, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	cacheKey := "SSO_USER:" + mobileNumber
+
+	if err := db.RedisGetToStruct(cacheKey, &user); err != nil {
+		if err != redis.Nil {
+			slog.Error("Unable to get data from redis", "error", err)
+		}
+	} else {
+		
+		return &user
+	}
+	
+	dbConn := db.InitDB()
+	defer dbConn.Close()
+	
+	err := dbConn.Conn.Query("SELECT user_id, first_name, last_name, mobile_number, password, created_at, updated_at FROM users WHERE mobile_number = ?", mobileNumber).Scan(&user.UserId,&user.FirstName, &user.LastName, &user.MobileNumber, &user.Password, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		log.Println("Unable to fetch result", err)
 		return nil
+	}
+
+	if err := db.RedisSetToStruct(cacheKey, &user, (1 * time.Hour)); err != nil {
+		slog.Error("Unable to set data to redis", "error", err)
 	}
 
 	return &user

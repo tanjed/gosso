@@ -1,6 +1,23 @@
 version: "3.8"
 
 services:
+  redis:
+    container_name: sso-redis
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      retries: 5
+      start_period: 5s
+      timeout: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    networks:
+      - cassandra-network
   cassandra:
     image: cassandra:3.11
     container_name: cassandra

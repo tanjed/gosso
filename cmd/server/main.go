@@ -18,8 +18,12 @@ import (
 func main() {
 	config.Load()
 
-	db := db.Init()
-	db.Close()
+	database := db.InitDB()
+	redis := db.InitRedis()
+
+	defer database.Close()
+	defer redis.Close()
+	
 	r := route.Load()
 	server := http.Server{
 		Addr: ":" + config.AppConfig.Port,

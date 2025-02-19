@@ -10,8 +10,11 @@ import (
 func main() {
 	config.Load()
 	migrationQueries := db.RegisterMigrationQueries()
-	database := db.Init()
+	database := db.InitDB()
+	redis := db.InitRedis()
+
 	defer database.Close()
+	defer redis.Close()
 	
 	
 

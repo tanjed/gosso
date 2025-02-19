@@ -21,7 +21,7 @@ type OauthToken struct {
 
 
 func (t *OauthToken) Insert() bool {
-	db := db.Init()
+	db := db.InitDB()
 	defer db.Close()	
 
 	err := db.Conn.Query("INSERT INTO oauth_tokens (token_id, client_id, user_id, scopes, revoked, type, expired_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
