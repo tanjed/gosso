@@ -15,13 +15,11 @@ const GRANT_TYPE_REFRESH_TOKEN = "refresh_token"
 const GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 
 type TokenRequest struct {
-	ClientName string 	`json:"client_name" validate:"required"`
-	ClientSecret string `json:"client_secret" validate:"required"`
-	Scope []string 		`json:"scope" validate:"required"`
 	GrantType string 	`json:"grant_type" validate:"required"`
 }
 
 func TokenHandler(w http.ResponseWriter, r *http.Request) {
+	
 	var tokenRequest TokenRequest 
 	body, err := io.ReadAll(r.Body)
 

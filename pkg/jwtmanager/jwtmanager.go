@@ -8,6 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/tanjed/go-sso/internal/config"
 	"github.com/tanjed/go-sso/internal/model"
+	"github.com/tanjed/go-sso/pkg/helpers"
 )
 
 const TOKEN_TYPE_ACCESS_TOKEN = "ACCESS_TOKEN"
@@ -27,7 +28,7 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-func NewJwtClaims(token_id, clientId, userId string, scopes []string, tokenType string) *CustomClaims{
+func NewJwtClaims(token_id, clientId string, userId *string, scopes []string, tokenType string) *CustomClaims{
 	expiredAt := time.Now().Add(2 * time.Hour)
 
 	if tokenType == TOKEN_TYPE_REFRESH_TOKEN {
@@ -37,7 +38,7 @@ func NewJwtClaims(token_id, clientId, userId string, scopes []string, tokenType 
 	return &CustomClaims{
 		TokenId: token_id,
 		ClientId: clientId,
-		UserId: userId,
+		UserId: *userId,
 		Scopes: scopes,
 		TokenType: tokenType,
 		ExpAt : expiredAt,
@@ -69,7 +70,29 @@ func NewJwtToken(claims *CustomClaims) (string, error){
 	return token, nil
 }
 
-func VerifyJwtToken(tokenStr string) bool {
+func ParseToken(tokenStr string) *CustomClaims {
+	var customClaims CustomClaims
+	token, err := jwt.ParseWithClaims(tokenStr, customClaims, func(token *jwt.Token) (interface{}, error) {
+        return JWT_SECRET, nil
+    })
+
+	if err != nil{
+		return nil
+	}
+
+	if !token.Valid {
+		return nil
+	}
+	
+	return &customClaims
+}
+
+func VerifyJwtToken(tokenStr string, tokenType string) bool {	
+	
+	if !helpers.ContainsInSlice(tokenType, []string{TOKEN_TYPE_ACCESS_TOKEN, TOKEN_TYPE_REFRESH_TOKEN})  {
+		return false
+	}
+
 	var customClaims CustomClaims
 	token, err := jwt.ParseWithClaims(tokenStr, customClaims, func(token *jwt.Token) (interface{}, error) {
         return JWT_SECRET, nil
@@ -83,9 +106,19 @@ func VerifyJwtToken(tokenStr string) bool {
 		return false
 	}
 
-	return !validateCustomClaims(customClaims)
+	return !validateCustomClaims(customClaims, tokenType)
 }
 
-func validateCustomClaims(claims jwt.Claims) bool{
+func validateCustomClaims(claims CustomClaims, tokenType string) bool{
+	oAuthToken := model.GetOAuthTokenById(claims.ID)
+
+	if oAuthToken.Type != tokenType {
+		return false
+	}
+
+	if oAuthToken.ExpiredAt.After(time.Now()) {
+		return false
+	}
+
 	return true
 }

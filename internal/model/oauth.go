@@ -34,6 +34,60 @@ func (t *OauthToken) Insert() bool {
 	return true
 }
 
+func (t *OauthToken) InvokeClient() bool{
+	db := db.InitDB()
+		
+	err := db.Conn.Query("UPDATED oauth_tokens SET revoked = 1, updated_at = ? WHERE client_id = ? AND revoked = 0 AND user_id IS NULL", 
+	time.Now(), t.ClientId).Exec()
+
+	if err != nil {
+		slog.Error("Unable to record token", "error", err)
+		return false
+	}
+
+	return true
+}
+
+func (t *OauthToken) InvokeUser() bool{
+	db := db.InitDB()
+		
+	err := db.Conn.Query("UPDATED oauth_tokens SET revoked = 1, updated_at = ? WHERE user_id = ? AND revoked = 0", 
+	time.Now(), t.TokenId).Exec()
+
+	if err != nil {
+		slog.Error("Unable to record token", "error", err)
+		return false
+	}
+
+	return true
+}
+
+func (t *OauthToken) InvokeToken() bool{
+	db := db.InitDB()
+		
+	err := db.Conn.Query("UPDATED oauth_tokens SET revoked = 1, updated_at = ? WHERE token_id = ?", 
+	time.Now(), t.UserId).Exec()
+
+	if err != nil {
+		slog.Error("Unable to record token", "error", err)
+		return false
+	}
+
+	return true
+}
+
+func GetOAuthTokenById(tokenId string) *OauthToken {
+	var oauthToken OauthToken
+	db := db.InitDB()
+
+	if err := db.Conn.Query("SELECT * FROM oauth_tokens WHERE token_id = ?", tokenId).Scan(oauthToken.toInterfaceSlice()...); err != nil {
+		slog.Error("Unable to fetch result", "error", err)
+		return nil
+	}
+	
+	return &oauthToken
+}	
+
 func NewOauthToken(tokenId, clientId, userId string, scopes []string, revoked int, tokenType string, expiredAt, created_at, updated_at time.Time) *OauthToken{
 	return &OauthToken{
 		TokenId: tokenId,
@@ -45,6 +99,21 @@ func NewOauthToken(tokenId, clientId, userId string, scopes []string, revoked in
 		ExpiredAt: expiredAt,
 		CreatedAt: created_at,
 		UpdatedAt: updated_at,
+	}
+}
+
+
+func (t OauthToken) toInterfaceSlice() []interface{} {
+	return []interface{}{
+		t.TokenId,
+		t.ClientId,
+		t.UserId,
+		t.Scopes,
+		t.Revoked,
+		t.Type,
+		t.ExpiredAt,
+		t.CreatedAt,
+		t.UpdatedAt,
 	}
 }
 

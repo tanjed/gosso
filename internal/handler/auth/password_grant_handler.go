@@ -14,6 +14,9 @@ import (
 
 type PasswordGrantRequest struct {
 	TokenRequest
+	ClientName string 	`json:"client_name" validate:"required"`
+	ClientSecret string `json:"client_secret" validate:"required"`
+	Scope []string 		`json:"scope" validate:"required"`
 	MobileNumber string `json:"mobile_number" validate:"required"`
 	Password string 	`json:"password" validate:"required"`
 }
@@ -64,7 +67,7 @@ func passwordGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func ()  {
 		accessTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
-			user.UserId, passwordGrantRequest.Scope, jwtmanager.TOKEN_TYPE_ACCESS_TOKEN)
+			&user.UserId, passwordGrantRequest.Scope, jwtmanager.TOKEN_TYPE_ACCESS_TOKEN)
 
 			accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
 
@@ -78,7 +81,7 @@ func passwordGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func ()  {
 		refreshTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
-			user.UserId, passwordGrantRequest.Scope, jwtmanager.TOKEN_TYPE_REFRESH_TOKEN)
+			&user.UserId, passwordGrantRequest.Scope, jwtmanager.TOKEN_TYPE_REFRESH_TOKEN)
 
 		refreshToken, err := jwtmanager.NewJwtToken(refreshTokenClaims)		
 
