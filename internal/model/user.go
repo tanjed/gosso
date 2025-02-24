@@ -41,10 +41,22 @@ func (e UserUnauthorized) Error() string {
 	return fmt.Sprintf("Error: %s (Code: %d)", e.Message, e.Code)
 }
 
+func (u *User) Insert() *User {
+	db := db.InitDB()
+	hashedPassword := hashutilities.GenerateHashFromString(u.Password)
+
+	if err := db.Conn.Query("INSERT INTO users (first_name, last_name, mobile_number, password, created_at, updated_at) VALUES (?,?,?,?,?,?)", u.FirstName,
+		u.LastName, u.MobileNumber, hashedPassword, u.CreatedAt, u.UpdatedAt).Exec(); err != nil {
+			slog.Error("Unable to insert user", "error", err)
+			return nil
+		}
+
+	return GetUserByMobileNumber(u.MobileNumber)
+}
 
 func AutheticateUser(mobileNumber string, password string) (*User, error) {
 
-	u := getUserByMobileNumber(mobileNumber)
+	u := GetUserByMobileNumber(mobileNumber)
 	
 	if u == nil {
 		return nil, &UserNotFound{
@@ -62,7 +74,7 @@ func AutheticateUser(mobileNumber string, password string) (*User, error) {
 	return u, nil
 }
 
-func getUserByMobileNumber(mobileNumber string) *User {
+func GetUserByMobileNumber(mobileNumber string) *User {
 	var user User
 	cacheKey := "SSO_USER:" + mobileNumber
 
@@ -89,4 +101,15 @@ func getUserByMobileNumber(mobileNumber string) *User {
 	}
 
 	return &user
+}
+
+func NewUser(firstName, lastName, mobileNumber, password string) *User {
+	return &User{
+		FirstName : firstName,
+		LastName : lastName,
+		MobileNumber : mobileNumber,
+		Password : password,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
 }

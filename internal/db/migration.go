@@ -16,13 +16,14 @@ func createClientsTable() {
 
 func createUsersTable() {
 	migrationQueries["user_table_create"] = `CREATE TABLE IF NOT EXISTS users (
-    user_id UUID PRIMARY KEY,
+    user_id UUID,
     first_name TEXT,
     last_name TEXT,
     mobile_number TEXT,
     password TEXT,
     created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    PRIMARY KEY(user_id, mobile_number)
 );
 `
     migrationQueries["user_table_client_name_index_create"] = `CREATE INDEX IF NOT EXISTS mobile_number_idx ON users(mobile_number);`

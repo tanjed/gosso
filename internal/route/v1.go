@@ -18,6 +18,7 @@ func loadV1Routes(router *mux.Router) {
 
 func loadPublicRoutes(router *mux.Router) {
 	router.HandleFunc("/token", auth.TokenHandler).Methods("POST")
+	router.HandleFunc("/register", auth.UserRegisterHandler).Methods("POST")
 }
 
 func loadPrivateRoutes(router *mux.Router) {
