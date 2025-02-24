@@ -98,7 +98,7 @@ func ParseToken(tokenStr string) *CustomClaims {
 	return &customClaims
 }
 
-func VerifyJwtToken(tokenStr string, tokenType string) bool {	
+func VerifyJwtToken(token *CustomClaims, tokenType string) bool {	
 	
 	if !helpers.ContainsInSlice(tokenType, []string{ 
 		model.TOKEN_TYPE_USER_ACCESS_TOKEN,  
@@ -108,23 +108,10 @@ func VerifyJwtToken(tokenStr string, tokenType string) bool {
 		return false
 	}
 
-	var customClaims CustomClaims
-	token, err := jwt.ParseWithClaims(tokenStr, customClaims, func(token *jwt.Token) (interface{}, error) {
-        return JWT_SECRET, nil
-    })
-
-	if err != nil{
-		return false
-	}
-
-	if !token.Valid {
-		return false
-	}
-
-	return !validateCustomClaims(customClaims, tokenType)
+	return !validateCustomClaims(token, tokenType)
 }
 
-func validateCustomClaims(claims CustomClaims, tokenType string) bool {
+func validateCustomClaims(claims *CustomClaims, tokenType string) bool {
     var tokenStructType model.TokenableInterface
 
     switch tokenType {

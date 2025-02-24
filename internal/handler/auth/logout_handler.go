@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -38,7 +39,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 
 	oAuthToken := model.GetOAuthTokenById(claims.TokenId, tokenStructType)
-
+	log.Println(oAuthToken.GetScopes())
 	if oAuthToken == nil {
 		responsemanager.ResponseUnprocessableEntity(&w, "Invalid token provided")
 		return

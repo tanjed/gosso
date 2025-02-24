@@ -258,11 +258,12 @@ func GetOAuthTokenById(tokenId string, model TokenableInterface) TokenableInterf
 		}
 		return clientRefreshToken
 	} else if userAccessToken, ok := model.(*UserAccessToken); ok {
-		if err := db.Conn.Query("SELECT token_id, client_id, user_id, revoked, expired_at, created_at, updated_at FROM user_access_tokens WHERE token_id = ?", tokenId).
+		if err := db.Conn.Query("SELECT token_id, client_id, user_id, scopes, revoked, expired_at, created_at, updated_at FROM user_access_tokens WHERE token_id = ?", tokenId).
 		Scan(
 			&userAccessToken.TokenId,
 			&userAccessToken.ClientId,
 			&userAccessToken.UserId,
+			&userAccessToken.Scopes,
 			&userAccessToken.Revoked,
 			&userAccessToken.ExpiredAt,
 			&userAccessToken.CreatedAt,

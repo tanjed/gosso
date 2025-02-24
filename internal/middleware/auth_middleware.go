@@ -16,10 +16,11 @@ func ValidateToken(next http.Handler) http.Handler {
 			return
 		}
 		parsedToken := jwtmanager.ParseToken(token)
-		if !jwtmanager.VerifyJwtToken(token, parsedToken.TokenType) {
+		if !jwtmanager.VerifyJwtToken(parsedToken, parsedToken.TokenType) {
 			responsemanager.ResponseUnAuthorized(&w, "Invalid token provided")
 			return
 		}
+		
 		next.ServeHTTP(w, r)
 	})
 }
