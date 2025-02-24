@@ -59,7 +59,7 @@ func clientCredentialsGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func ()  {
 		accessTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
-			nil, clientCredentialsGrantRequest.Scope, jwtmanager.TOKEN_TYPE_ACCESS_TOKEN)
+			nil, clientCredentialsGrantRequest.Scope, model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN)
 
 			accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
 
@@ -73,7 +73,7 @@ func clientCredentialsGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func ()  {
 		refreshTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
-			nil, clientCredentialsGrantRequest.Scope, jwtmanager.TOKEN_TYPE_REFRESH_TOKEN)
+			nil, clientCredentialsGrantRequest.Scope, model.TOKEN_TYPE_CLIENT_REFRESH_TOKEN)
 
 		refreshToken, err := jwtmanager.NewJwtToken(refreshTokenClaims)		
 

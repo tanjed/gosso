@@ -6,25 +6,54 @@ import (
 
 	"github.com/tanjed/go-sso/internal/db"
 )
+const TOKEN_TYPE_USER_ACCESS_TOKEN = "USER_ACCESS_TOKEN"
+const TOKEN_TYPE_USER_REFRESH_TOKEN = "USER_REFRESH_TOKEN"
+const TOKEN_TYPE_CLIENT_ACCESS_TOKEN = "CLIENT_ACCESS_TOKEN"
+const TOKEN_TYPE_CLIENT_REFRESH_TOKEN = "CLIENT_REFRESH_TOKEN"
 
-type OauthToken struct {
+type TokenableInterface interface {
+	Insert() bool
+	InvokeToken() bool
+	GetExpiry() time.Time
+	GetClientId() string
+	GetScopes() []string
+}
+
+type Token struct {
 	TokenId string
 	ClientId string
-	UserId string
 	Scopes []string
 	Revoked int
-	Type string
 	ExpiredAt time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
+type UserAccessToken struct {
+	UserId string
+	Token
+}
 
-func (t *OauthToken) Insert() bool {
+type UserRefreshToken struct {
+	UserId string
+	Token
+}
+
+type ClientAccessToken struct {
+	Token
+}
+
+type ClientRefreshToken struct {
+	Token
+}
+
+
+
+func (t *UserAccessToken) Insert() bool {
 	db := db.InitDB()
-		
-	err := db.Conn.Query("INSERT INTO oauth_tokens (token_id, client_id, user_id, scopes, revoked, type, expired_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-	t.TokenId, t.ClientId, t.UserId, t.Scopes, t.Revoked, t.Type, t.ExpiredAt, t.CreatedAt, t.UpdatedAt).Exec()
+	
+	err := db.Conn.Query("INSERT INTO user_access_tokens (token_id, client_id, user_id, scopes, revoked, expired_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+	t.TokenId, t.ClientId, t.UserId, t.Scopes, t.Revoked, t.ExpiredAt, t.CreatedAt, t.UpdatedAt).Exec()
 
 	if err != nil {
 		slog.Error("Unable to record token", "error", err)
@@ -34,11 +63,38 @@ func (t *OauthToken) Insert() bool {
 	return true
 }
 
-func (t *OauthToken) InvokeClient() bool{
+func (t *UserAccessToken) GetExpiry() time.Time {
+	return t.ExpiredAt
+}
+
+func (t *UserAccessToken) GetClientId() string {
+	return t.ClientId
+}
+
+func (t *UserAccessToken) GetScopes() []string {
+	return t.Scopes
+}
+
+func (t *UserAccessToken) InvokeToken() bool{
 	db := db.InitDB()
 		
-	err := db.Conn.Query("UPDATED oauth_tokens SET revoked = 1, updated_at = ? WHERE client_id = ? AND revoked = 0 AND user_id IS NULL", 
-	time.Now(), t.ClientId).Exec()
+	err := db.Conn.Query("UPDATE user_access_tokens SET revoked = 1, updated_at = ? WHERE token_id = ? AND user_id = ?", 
+	time.Now(),t.TokenId, t.UserId).Exec()
+
+	if err != nil {
+		slog.Error("Unable to invoke token", "error", err)
+		return false
+	}
+
+	return true
+}
+
+
+func (t *UserRefreshToken) Insert() bool {
+	db := db.InitDB()
+	
+	err := db.Conn.Query("INSERT INTO user_refresh_tokens (token_id, client_id, user_id, scopes, revoked, expired_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+	t.TokenId, t.ClientId, t.UserId, t.Scopes, t.Revoked, t.ExpiredAt, t.CreatedAt, t.UpdatedAt).Exec()
 
 	if err != nil {
 		slog.Error("Unable to record token", "error", err)
@@ -48,11 +104,43 @@ func (t *OauthToken) InvokeClient() bool{
 	return true
 }
 
-func (t *OauthToken) InvokeUser() bool{
+func (t *UserRefreshToken) GetExpiry() time.Time {
+	return t.ExpiredAt
+}
+
+func (t *UserRefreshToken) GetProperties() *UserRefreshToken {
+	return t
+}
+
+func (t *UserRefreshToken) GetClientId() string {
+	return t.ClientId
+}
+
+func (t *UserRefreshToken) GetScopes() []string {
+	return t.Scopes
+}
+
+
+func (t *UserRefreshToken) InvokeToken() bool{
 	db := db.InitDB()
 		
-	err := db.Conn.Query("UPDATED oauth_tokens SET revoked = 1, updated_at = ? WHERE user_id = ? AND revoked = 0", 
-	time.Now(), t.TokenId).Exec()
+	err := db.Conn.Query("UPDATE user_refresh_tokens SET revoked = 1, updated_at = ? WHERE token_id = ? AND user_id = ?", 
+	time.Now(), t.TokenId, t.UserId).Exec()
+
+	if err != nil {
+		slog.Error("Unable to invoke token", "error", err)
+		return false
+	}
+
+	return true
+}
+
+
+func (t *ClientAccessToken) Insert() bool {
+	db := db.InitDB()
+	
+	err := db.Conn.Query("INSERT INTO client_access_tokens (token_id, client_id, scopes, revoked, expired_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+	t.TokenId, t.ClientId, t.Scopes, t.Revoked, t.ExpiredAt, t.CreatedAt, t.UpdatedAt).Exec()
 
 	if err != nil {
 		slog.Error("Unable to record token", "error", err)
@@ -62,11 +150,42 @@ func (t *OauthToken) InvokeUser() bool{
 	return true
 }
 
-func (t *OauthToken) InvokeToken() bool{
+func (t *ClientAccessToken) GetExpiry() time.Time {
+	return t.ExpiredAt
+}
+
+func (t *ClientAccessToken) GetProperties() *ClientAccessToken {
+	return t
+}
+
+
+func (t *ClientAccessToken) GetClientId() string {
+	return t.ClientId
+}
+
+func (t *ClientAccessToken) GetScopes() []string {
+	return t.Scopes
+}
+
+func (t *ClientAccessToken) InvokeToken() bool{
 	db := db.InitDB()
 		
-	err := db.Conn.Query("UPDATED oauth_tokens SET revoked = 1, updated_at = ? WHERE token_id = ?", 
-	time.Now(), t.UserId).Exec()
+	err := db.Conn.Query("UPDATE client_access_tokens SET revoked = 1, updated_at = ? WHERE token_id = ? AND client_id = ?", 
+	time.Now(), t.TokenId, t.ClientId).Exec()
+
+	if err != nil {
+		slog.Error("Unable to invoke token", "error", err)
+		return false
+	}
+
+	return true
+}
+
+func (t *ClientRefreshToken) Insert() bool {
+	db := db.InitDB()
+	
+	err := db.Conn.Query("INSERT INTO client_refresh_tokens (token_id, client_id, scopes, revoked, expired_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+	t.TokenId, t.ClientId, t.Scopes, t.Revoked, t.ExpiredAt, t.CreatedAt, t.UpdatedAt).Exec()
 
 	if err != nil {
 		slog.Error("Unable to record token", "error", err)
@@ -76,44 +195,104 @@ func (t *OauthToken) InvokeToken() bool{
 	return true
 }
 
-func GetOAuthTokenById(tokenId string) *OauthToken {
-	var oauthToken OauthToken
+func (t *ClientRefreshToken) GetExpiry() time.Time {
+	return t.ExpiredAt
+}
+
+func (t *ClientRefreshToken) GetProperties() *ClientRefreshToken {
+	return t
+}
+
+func (t *ClientRefreshToken) GetClientId() string {
+	return t.ClientId
+}
+
+func (t *ClientRefreshToken) GetScopes() []string {
+	return t.Scopes
+}
+
+func (t *ClientRefreshToken) InvokeToken() bool{
+	db := db.InitDB()
+		
+	err := db.Conn.Query("UPDATE client_refresh_tokens SET revoked = 1, updated_at = ? WHERE token_id = ? AND client_id = ?", 
+	time.Now(), t.TokenId, t.ClientId).Exec()
+
+	if err != nil {
+		slog.Error("Unable to invoke token", "error", err)
+		return false
+	}
+
+	return true
+}
+
+func GetOAuthTokenById(tokenId string, model TokenableInterface) TokenableInterface {
 	db := db.InitDB()
 
-	if err := db.Conn.Query("SELECT * FROM oauth_tokens WHERE token_id = ?", tokenId).Scan(oauthToken.toInterfaceSlice()...); err != nil {
-		slog.Error("Unable to fetch result", "error", err)
+	if clientAccessToken, ok := model.(*ClientAccessToken); ok {
+		if err := db.Conn.Query("SELECT token_id, client_id, revoked, expired_at, created_at, updated_at FROM client_access_tokens WHERE token_id = ?", tokenId).
+		Scan(
+			&clientAccessToken.TokenId,
+			&clientAccessToken.ClientId,
+			&clientAccessToken.Revoked,
+			&clientAccessToken.ExpiredAt,
+			&clientAccessToken.CreatedAt,
+			&clientAccessToken.UpdatedAt,
+		); err != nil {
+			slog.Error("Unable to fetch token", "error", err)
+			return nil
+		}
+		return clientAccessToken
+		
+	} else if clientRefreshToken, ok := model.(*ClientRefreshToken); ok {
+		if err := db.Conn.Query("SELECT token_id, client_id, revoked, expired_at, created_at, updated_at FROM client_refresh_tokens WHERE token_id = ?", tokenId).
+		Scan(
+			&clientRefreshToken.TokenId,
+			&clientRefreshToken.ClientId,
+			&clientRefreshToken.Revoked,
+			&clientRefreshToken.ExpiredAt,
+			&clientRefreshToken.CreatedAt,
+			&clientRefreshToken.UpdatedAt,
+		); err != nil {
+			slog.Error("Unable to fetch token", "error", err)
+			return nil
+		}
+		return clientRefreshToken
+	} else if userAccessToken, ok := model.(*UserAccessToken); ok {
+		if err := db.Conn.Query("SELECT token_id, client_id, user_id, revoked, expired_at, created_at, updated_at FROM user_access_tokens WHERE token_id = ?", tokenId).
+		Scan(
+			&userAccessToken.TokenId,
+			&userAccessToken.ClientId,
+			&userAccessToken.UserId,
+			&userAccessToken.Revoked,
+			&userAccessToken.ExpiredAt,
+			&userAccessToken.CreatedAt,
+			&userAccessToken.UpdatedAt,
+		); err != nil {
+			slog.Error("Unable to fetch token", "error", err)
+			return nil
+		}
+		return userAccessToken
+		
+	} else if userRefreshToken, ok := model.(*UserRefreshToken); ok {
+		if err := db.Conn.Query("SELECT token_id, client_id, user_id, revoked, expired_at, created_at, updated_at FROM user_refresh_tokens WHERE token_id = ?", tokenId).
+		Scan(
+			&userRefreshToken.TokenId,
+			&userRefreshToken.ClientId,
+			&userRefreshToken.UserId,
+			&userRefreshToken.Revoked,
+			&userRefreshToken.ExpiredAt,
+			&userRefreshToken.CreatedAt,
+			&userRefreshToken.UpdatedAt,
+		); err != nil {
+			slog.Error("Unable to fetch token", "error", err)
+			return nil
+		}
+		return userRefreshToken
+	} else {
 		return nil
 	}
-	
-	return &oauthToken
-}	
-
-func NewOauthToken(tokenId, clientId, userId string, scopes []string, revoked int, tokenType string, expiredAt, created_at, updated_at time.Time) *OauthToken{
-	return &OauthToken{
-		TokenId: tokenId,
-		ClientId: clientId,
-		UserId: userId,
-		Scopes: scopes,
-		Revoked: revoked,
-		Type: tokenType,
-		ExpiredAt: expiredAt,
-		CreatedAt: created_at,
-		UpdatedAt: updated_at,
-	}
 }
 
 
-func (t OauthToken) toInterfaceSlice() []interface{} {
-	return []interface{}{
-		t.TokenId,
-		t.ClientId,
-		t.UserId,
-		t.Scopes,
-		t.Revoked,
-		t.Type,
-		t.ExpiredAt,
-		t.CreatedAt,
-		t.UpdatedAt,
-	}
-}
+
 

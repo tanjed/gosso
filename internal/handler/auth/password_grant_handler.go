@@ -67,7 +67,7 @@ func passwordGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func ()  {
 		accessTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
-			&user.UserId, passwordGrantRequest.Scope, jwtmanager.TOKEN_TYPE_ACCESS_TOKEN)
+			&user.UserId, passwordGrantRequest.Scope, model.TOKEN_TYPE_USER_ACCESS_TOKEN)
 
 			accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
 
@@ -81,7 +81,7 @@ func passwordGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func ()  {
 		refreshTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
-			&user.UserId, passwordGrantRequest.Scope, jwtmanager.TOKEN_TYPE_REFRESH_TOKEN)
+			&user.UserId, passwordGrantRequest.Scope, model.TOKEN_TYPE_USER_REFRESH_TOKEN)
 
 		refreshToken, err := jwtmanager.NewJwtToken(refreshTokenClaims)		
 

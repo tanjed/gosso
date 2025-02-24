@@ -42,17 +42,53 @@ func createClientAuthorizationCodesTable() {
 
 
 func createOauthTokenTable() {
-    migrationQueries["oauth_tokens_table_create"] = `CREATE TABLE oauth_tokens (
+    migrationQueries["user_access_tokens_table_create"] = `CREATE TABLE IF NOT EXISTS user_access_tokens (
     token_id TEXT,
     client_id TEXT,
     user_id TEXT,
     scopes LIST<TEXT>,
     revoked INT,
-    type TEXT,
     expired_at TIMESTAMP,
     created_at TIMESTAMP,
     updated_at TIMESTAMP,
-    PRIMARY KEY((token_id, client_id, user_id), type)
+    PRIMARY KEY(token_id, user_id)
+);
+`
+
+migrationQueries["user_refresh_tokens_table_create"] = `CREATE TABLE IF NOT EXISTS user_refresh_tokens (
+    token_id TEXT,
+    client_id TEXT,
+    user_id TEXT,
+    scopes LIST<TEXT>,
+    revoked INT,
+    expired_at TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    PRIMARY KEY(token_id, user_id)
+);
+`
+
+migrationQueries["client_access_tokens_table_create"] = `CREATE TABLE IF NOT EXISTS client_access_tokens (
+    token_id TEXT,
+    client_id TEXT,
+    scopes LIST<TEXT>,
+    revoked INT,
+    expired_at TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    PRIMARY KEY(token_id, client_id)
+);
+`
+
+migrationQueries["client_refresh_tokens_table_create"] = `CREATE TABLE IF NOT EXISTS client_refresh_tokens (
+    token_id TEXT,
+    client_id TEXT,
+    scopes LIST<TEXT>,
+    revoked INT,
+    expired_at TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    PRIMARY KEY(token_id, client_id)
 );
 `
 }
