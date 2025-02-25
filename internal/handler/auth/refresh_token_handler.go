@@ -46,22 +46,8 @@ func refreshTokenGrantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var tokenStructType model.TokenableInterface
 
-
-    switch  parsedToken.TokenType {
-    case model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN:
-        tokenStructType = &model.ClientAccessToken{}
-    case model.TOKEN_TYPE_CLIENT_REFRESH_TOKEN:
-        tokenStructType = &model.ClientRefreshToken{}
-    case model.TOKEN_TYPE_USER_ACCESS_TOKEN:
-        tokenStructType = &model.UserAccessToken{}
-    case model.TOKEN_TYPE_USER_REFRESH_TOKEN:
-        tokenStructType = &model.UserRefreshToken{}
-    }
-
-
-	oAuthToken := model.GetOAuthTokenById(parsedToken.TokenId, tokenStructType)
+	oAuthToken := model.GetOAuthTokenById(parsedToken.TokenId)
 
 	if oAuthToken == nil {
 		slog.Error("Invalid token provided")
@@ -69,8 +55,8 @@ func refreshTokenGrantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), oAuthToken.GetClientId(),
-			nil, oAuthToken.GetScopes(), parsedToken.TokenType)
+	accessTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), oAuthToken.ClientId,
+			&oAuthToken.UserId, oAuthToken.Scopes, parsedToken.TokenType)
 
 	accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
 

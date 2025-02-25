@@ -1,21 +1,25 @@
 package db
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"math/rand"
+	"strconv"
 	"sync"
+	"time"
 
-	"github.com/gocql/gocql"
 	"github.com/tanjed/go-sso/internal/config"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const DB_DRIVER_POSTGRES = "postgres"
 
 type DB struct {
 	Id int
-	Conn *gocql.Session
+	Conn *mongo.Client
 }
 
 var dbInstance *DB
@@ -24,25 +28,25 @@ var dbInstanceOnce sync.Once
 func InitDB() *DB{
 
 	dbInstanceOnce.Do(func ()  {
-		cluster := gocql.NewCluster(config.AppConfig.DB_HOST)
-		cluster.Port = config.AppConfig.DB_PORT
-		cluster.Keyspace = config.AppConfig.DB_NAME     
-		cluster.NumConns = 500
-		cluster.Consistency = gocql.Quorum
-		cluster.Authenticator = gocql.PasswordAuthenticator{
-			Username: config.AppConfig.DB_USER,
-			Password: config.AppConfig.DB_PASSWORD,
-		}
-
-		session, err := cluster.CreateSession()
+			fmt.Println(getConnectionString())
+		client, err := mongo.Connect(options.Client().ApplyURI(getConnectionString()))
 
 		if err != nil {
-			slog.Error("Error creating Cassandra session:", "error", err)
-		}else {
-			dbInstance = &DB{
-				Id: rand.Intn(101),
-				Conn: session,
-			}
+			slog.Error("Error creating mongo session:", "error", err)
+			log.Fatal(err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+		defer cancel()
+
+		if err:= client.Ping(ctx, nil); err != nil {
+			slog.Error("Error creating mongo session:", "error", err)
+			log.Fatal(err)
+		}
+
+		dbInstance = &DB{
+			Id: rand.Intn(101),
+			Conn: client,
 		}
 			
 	})
@@ -56,6 +60,12 @@ func InitDB() *DB{
 
 func CloseDB() {
 	if dbInstance != nil && dbInstance.Conn != nil {
-		dbInstance.Conn.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+		defer cancel()
+		dbInstance.Conn.Disconnect(ctx)
 	}
+}
+
+func getConnectionString() string {
+	return "mongodb://"+config.AppConfig.DB_USER+":"+config.AppConfig.DB_PASSWORD+"@"+config.AppConfig.DB_HOST+":"+strconv.Itoa(config.AppConfig.DB_PORT)
 }

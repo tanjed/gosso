@@ -1,25 +1,31 @@
 package model
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+	"github.com/tanjed/go-sso/internal/config"
 	"github.com/tanjed/go-sso/internal/db"
 	"github.com/tanjed/go-sso/pkg/hashutilities"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+
+const USER_COLLECTION_NAME = "users"
 type User struct {
-	UserId string
-	FirstName string
-	LastName string
-	MobileNumber string
-	Password string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	UserId string `bson:"user_id"`
+	FirstName string `bson:"first_name"`
+	LastName string `bson:"last_name"`
+	MobileNumber string `bson:"mobile_number"`
+	Password string `bson:"password"`
+	CreatedAt time.Time `bson:"created_at"`
+	UpdatedAt time.Time `bson:"updated_at"`
 
 }
 
@@ -41,17 +47,28 @@ func (e UserUnauthorized) Error() string {
 	return fmt.Sprintf("Error: %s (Code: %d)", e.Message, e.Code)
 }
 
-func (u *User) Insert() *User {
+func (u *User) Insert() bool {
 	db := db.InitDB()
 	hashedPassword := hashutilities.GenerateHashFromString(u.Password)
+	collection := db.Conn.Database(config.AppConfig.DB_NAME).Collection(USER_COLLECTION_NAME)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+	res, err := collection.InsertOne(ctx, User{
+		UserId: u.UserId,
+		FirstName: u.FirstName,
+		LastName: u.LastName,
+		MobileNumber: u.MobileNumber,
+		Password: hashedPassword,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	})
 
-	if err := db.Conn.Query("INSERT INTO users (first_name, last_name, mobile_number, password, created_at, updated_at) VALUES (?,?,?,?,?,?)", u.FirstName,
-		u.LastName, u.MobileNumber, hashedPassword, u.CreatedAt, u.UpdatedAt).Exec(); err != nil {
-			slog.Error("Unable to insert user", "error", err)
-			return nil
-		}
+	if err != nil {
+		slog.Error("Unable to insert user", "error", err)
+		return false
+	}
 
-	return GetUserByMobileNumber(u.MobileNumber)
+	return res.Acknowledged
 }
 
 func AutheticateUser(mobileNumber string, password string) (*User, error) {
@@ -88,8 +105,10 @@ func GetUserByMobileNumber(mobileNumber string) *User {
 	}
 	
 	dbConn := db.InitDB()
-	
-	err := dbConn.Conn.Query("SELECT user_id, first_name, last_name, mobile_number, password, created_at, updated_at FROM users WHERE mobile_number = ?", mobileNumber).Scan(&user.UserId,&user.FirstName, &user.LastName, &user.MobileNumber, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	collection := dbConn.Conn.Database(config.AppConfig.DB_NAME).Collection(USER_COLLECTION_NAME)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+	err := collection.FindOne(ctx, bson.D{{"mobile_number", mobileNumber}}).Decode(&user)
 
 	if err != nil {
 		log.Println("Unable to fetch result", err)
@@ -105,6 +124,7 @@ func GetUserByMobileNumber(mobileNumber string) *User {
 
 func NewUser(firstName, lastName, mobileNumber, password string) *User {
 	return &User{
+		UserId: uuid.New().String(),
 		FirstName : firstName,
 		LastName : lastName,
 		MobileNumber : mobileNumber,

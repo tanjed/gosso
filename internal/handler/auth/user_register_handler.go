@@ -54,13 +54,13 @@ func UserRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := model.NewUser(userRegisterRequest.FirstName, userRegisterRequest.LastName, userRegisterRequest.MobileNumber, userRegisterRequest.Password)
-	createdUser := user.Insert()
-
-	if createdUser == nil {
+ 
+	if !user.Insert() {
 		responsemanager.ResponseServerError(&w, "Unable to create user")
 		return
 	}
 
+	createdUser := model.GetUserByMobileNumber(userRegisterRequest.MobileNumber)
 	responsemanager.ResponseOK(&w, map[string]interface{}{
 		"user" : map[string]interface{}{
 			"user_id" : createdUser.UserId,

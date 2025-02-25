@@ -1,26 +1,27 @@
 package model
 
 import (
-	"crypto/rand"
-	"encoding/base64"
+	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/tanjed/go-sso/internal/config"
 	"github.com/tanjed/go-sso/internal/db"
 	"github.com/tanjed/go-sso/pkg/hashutilities"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const TIME_FORMAT = "2006-01-02 15:04:05.0000"
+const CLIENT_COLLECTION_NAME = "clients"
 type Client struct {
-	ClientId string 	`json:"client_id" db:"client_id"`
-	ClientName string 	`json:"client_name" db:"client_name" validate:"required"`
-	ClientSecret string `json:"client_secret" db:"client_secret" validate:"required"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	ClientId string 	`json:"client_id" bson:"client_id"`
+	ClientName string 	`json:"client_name" bson:"client_name" validate:"required"`
+	ClientSecret string `json:"client_secret" bson:"client_secret" validate:"required"`
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 type clientUnAuthorizationCode struct {
@@ -48,6 +49,29 @@ func (e ClientNotFoundError) Error() string {
 func (e ClientUnAuthorizedError) Error() string {
 	return fmt.Sprintf("Error: %s (Code: %d)", e.Message, e.Code)
 }
+
+func (c *Client) Insert() bool {
+	db := db.InitDB()
+	hashedPassword := hashutilities.GenerateHashFromString(c.ClientSecret)
+	collection := db.Conn.Database(config.AppConfig.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+	res, err := collection.InsertOne(ctx, Client{
+		ClientId: c.ClientId,
+		ClientName: c.ClientName,
+		ClientSecret: hashedPassword,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	})
+
+	if err != nil {
+		slog.Error("Unable to insert client", "error", err)
+		return false
+	}
+
+	return res.Acknowledged
+}
+
 
 func AuthenticateClient(clientName string, clientSecret string) (*Client, error)  {
 	c := getClientByClientId(clientName)
@@ -84,10 +108,12 @@ func getClientByClientId(clientName string) *Client {
 	}
 
 	dbConn := db.InitDB()
-	
 
-	err := dbConn.Conn.Query("SELECT client_id, client_name, client_secret, created_at, updated_at  FROM clients WHERE client_name = ?", clientName).
-	Scan(&client.ClientId, &client.ClientName, &client.ClientSecret, &client.CreatedAt, &client.UpdatedAt)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+	
+	collection := dbConn.Conn.Database(config.AppConfig.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
+	err := collection.FindOne(ctx, bson.D{{"client_name", clientName}}).Decode(&client)
 
 	if err != nil {
 		slog.Error("Unable to fetch result", "error", err)
@@ -100,47 +126,58 @@ func getClientByClientId(clientName string) *Client {
 	return &client
 }
 
-func ClientHasValidSession(clientId string, redirectUri string) (*clientUnAuthorizationCode, error) {
-	db := db.InitDB()
-	var clientAuthorizationCode clientUnAuthorizationCode
-	err := db.Conn.Query("SELECT client_id, client_code, redirect_uri, generated_at, expired_at FROM client_authorization_codes WHERE client_id = ? AND redirect_uri = ? AND expired_at > ?", clientId, redirectUri, time.Now()).
-	Scan(&clientAuthorizationCode.ClientId, &clientAuthorizationCode.ClientCode, &clientAuthorizationCode.RedirectUri, &clientAuthorizationCode.GeneratedAt, &clientAuthorizationCode.ExpiredAt)
+// func ClientHasValidSession(clientId string, redirectUri string) (*clientUnAuthorizationCode, error) {
+// 	db := db.InitDB()
+// 	var clientAuthorizationCode clientUnAuthorizationCode
+// 	err := db.Conn.Query("SELECT client_id, client_code, redirect_uri, generated_at, expired_at FROM client_authorization_codes WHERE client_id = ? AND redirect_uri = ? AND expired_at > ?", clientId, redirectUri, time.Now()).
+// 	Scan(&clientAuthorizationCode.ClientId, &clientAuthorizationCode.ClientCode, &clientAuthorizationCode.RedirectUri, &clientAuthorizationCode.GeneratedAt, &clientAuthorizationCode.ExpiredAt)
 
-	if err != nil {
-		log.Println("Unable to fetch result", err)
-		return nil, err
-	}
+// 	if err != nil {
+// 		log.Println("Unable to fetch result", err)
+// 		return nil, err
+// 	}
 
-	return &clientAuthorizationCode, nil
-}
+// 	return &clientAuthorizationCode, nil
+// }
 
-func NewClientAuthorizationCode(clientId string, redirectUri string) (*clientUnAuthorizationCode, error){
-	clientUnAuthorizationCode := clientUnAuthorizationCode {
+// func NewClientAuthorizationCode(clientId string, redirectUri string) (*clientUnAuthorizationCode, error){
+// 	clientUnAuthorizationCode := clientUnAuthorizationCode {
+// 		ClientId: clientId,
+// 		ClientCode: generateAuthorizationCode(),
+// 		RedirectUri: redirectUri,
+// 		GeneratedAt: time.Now(),
+// 		ExpiredAt: time.Now().Add(30 * time.Second),
+// 	}
+// 	err := insertClientAuthorizationCode(clientUnAuthorizationCode)
+
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return &clientUnAuthorizationCode, nil
+// }
+
+// func insertClientAuthorizationCode(c clientUnAuthorizationCode) error {
+// 	db := db.InitDB()
+
+// 	return db.Conn.Query("INSERT INTO client_authorization_codes (client_id, client_code, redirect_uri, generated_at, expired_at) VALUES (?,?,?,?,?)", c.ClientId, c.ClientCode, c.RedirectUri, c.GeneratedAt, c.ExpiredAt).Exec()
+// }
+
+// func generateAuthorizationCode() string {
+// 	code := make([]byte, 32)
+// 	_, err := rand.Read(code)
+// 	if err != nil {
+// 		log.Fatal("Failed to generate authorization code:", err)
+// 	}
+// 	return base64.URLEncoding.EncodeToString(code)
+// }
+
+
+func NewClient(clientId, clientName, clientSecret string) *Client {
+	return &Client{
 		ClientId: clientId,
-		ClientCode: generateAuthorizationCode(),
-		RedirectUri: redirectUri,
-		GeneratedAt: time.Now(),
-		ExpiredAt: time.Now().Add(30 * time.Second),
+		ClientName: clientName,
+		ClientSecret: clientSecret,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
-	err := insertClientAuthorizationCode(clientUnAuthorizationCode)
-
-	if err != nil {
-		return nil, err
-	}
-	return &clientUnAuthorizationCode, nil
-}
-
-func insertClientAuthorizationCode(c clientUnAuthorizationCode) error {
-	db := db.InitDB()
-
-	return db.Conn.Query("INSERT INTO client_authorization_codes (client_id, client_code, redirect_uri, generated_at, expired_at) VALUES (?,?,?,?,?)", c.ClientId, c.ClientCode, c.RedirectUri, c.GeneratedAt, c.ExpiredAt).Exec()
-}
-
-func generateAuthorizationCode() string {
-	code := make([]byte, 32)
-	_, err := rand.Read(code)
-	if err != nil {
-		log.Fatal("Failed to generate authorization code:", err)
-	}
-	return base64.URLEncoding.EncodeToString(code)
 }

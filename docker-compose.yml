@@ -17,7 +17,7 @@ services:
         limits:
           memory: 64M
     networks:
-      - cassandra-network
+      - sso-network
   cassandra:
     image: cassandra:3.11
     container_name: cassandra
@@ -38,7 +38,7 @@ services:
     volumes:
       - ./docker/db/cassandra/data:/var/lib/cassandra
     networks:
-      - cassandra-network
+      - sso-network
 
   # Optional: a client to interact with Cassandra, like cqlsh
   cqlsh:
@@ -48,12 +48,41 @@ services:
     depends_on:
       - cassandra
     networks:
-      - cassandra-network
+      - sso-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: sso
+      MONGO_INITDB_ROOT_PASSWORD: sso
+    volumes:
+      - ./docker/db/mongodb/data:/data/db
+    restart: always
+    networks:
+      - sso-network
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: sso
+      ME_CONFIG_MONGODB_ADMINPASSWORD: sso
+      ME_CONFIG_MONGODB_SERVER: mongodb
+    depends_on:
+      - mongodb
+    restart: always
+    networks:
+      - sso-network
 
 volumes:
-  cassandra-data:
+  sso-data:
     driver: local
 
 networks:
-  cassandra-network:
+  sso-network:
     driver: bridge
