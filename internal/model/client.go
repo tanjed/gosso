@@ -16,6 +16,10 @@ import (
 
 const TIME_FORMAT = "2006-01-02 15:04:05.0000"
 const CLIENT_COLLECTION_NAME = "clients"
+
+type UserableInterface interface {
+	Insert() bool
+}
 type Client struct {
 	ClientId string 	`json:"client_id" bson:"client_id"`
 	ClientName string 	`json:"client_name" bson:"client_name" validate:"required"`
@@ -74,7 +78,7 @@ func (c *Client) Insert() bool {
 
 
 func AuthenticateClient(clientName string, clientSecret string) (*Client, error)  {
-	c := getClientByClientId(clientName)
+	c := GetClientByClientName(clientName)
 	
 	if c == nil {
 		return nil, &ClientNotFoundError{
@@ -94,7 +98,7 @@ func AuthenticateClient(clientName string, clientSecret string) (*Client, error)
 	return c, nil 
 }
 
-func getClientByClientId(clientName string) *Client {
+func GetClientByClientName(clientName string) *Client {
 	var client Client
 	cacheKey := "SSO_CLIENT:" + clientName
 
@@ -114,6 +118,38 @@ func getClientByClientId(clientName string) *Client {
 	
 	collection := dbConn.Conn.Database(config.AppConfig.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
 	err := collection.FindOne(ctx, bson.D{{"client_name", clientName}}).Decode(&client)
+
+	if err != nil {
+		slog.Error("Unable to fetch result", "error", err)
+		return nil
+	}
+	
+	if err := db.RedisSetToStruct(cacheKey, &client, (1 * time.Hour)); err != nil {
+		slog.Error("Unable to set data to redis", "error", err)
+	}
+	return &client
+}
+
+func GetClientById(clientId string) *Client {
+	var client Client
+	cacheKey := "SSO_CLIENT_BY_CLIENT_ID:" + clientId
+
+	if err := db.RedisGetToStruct(cacheKey, &client); err != nil {
+		if err != redis.Nil {
+			slog.Error("Unable to get data from redis", "error", err)
+		}
+	} else {
+		
+		return &client
+	}
+
+	dbConn := db.InitDB()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+	
+	collection := dbConn.Conn.Database(config.AppConfig.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
+	err := collection.FindOne(ctx, bson.D{{"client_id", clientId}}).Decode(&client)
 
 	if err != nil {
 		slog.Error("Unable to fetch result", "error", err)

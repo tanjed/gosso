@@ -33,6 +33,7 @@ func (t *OauthToken) Insert() bool {
 	collection := db.Conn.Database(config.AppConfig.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
+	
 	res, err := collection.InsertOne(ctx, t)
 
 	if err != nil {

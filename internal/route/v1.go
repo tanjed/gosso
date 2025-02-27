@@ -3,6 +3,7 @@ package route
 import (
 	"github.com/gorilla/mux"
 	"github.com/tanjed/go-sso/internal/handler/auth"
+	"github.com/tanjed/go-sso/internal/handler/profile"
 	"github.com/tanjed/go-sso/internal/middleware"
 )
 
@@ -23,4 +24,5 @@ func loadPublicRoutes(router *mux.Router) {
 
 func loadPrivateRoutes(router *mux.Router) {
 	router.HandleFunc("/invoke", auth.LogoutHandler).Methods("POST")
+	router.HandleFunc("/profile", profile.UserProfileHandler).Methods("GET")
 }

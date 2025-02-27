@@ -2,7 +2,6 @@ package auth
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -21,13 +20,12 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&logoutRequest)
 	token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", -1)
 	claims := jwtmanager.ParseToken(token)
-	fmt.Println(claims)
+
 	if claims == nil {
 		responsemanager.ResponseUnprocessableEntity(&w, "Invalid token provided")
 		return
 	}
 	
-	fmt.Println(claims.TokenId)
 	oAuthToken := model.GetOAuthTokenById(claims.TokenId)
 	
 	if oAuthToken == nil {

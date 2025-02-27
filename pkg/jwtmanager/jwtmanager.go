@@ -26,8 +26,28 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
+type TokenExpiredException struct {
+	Message string
+	Code int
+}
+
+type InvalidTokenException struct {
+	Message string
+	Code int
+}
+
+func (e TokenExpiredException) Error() string {
+	return fmt.Sprintf("Error: %s (Code: %d)", e.Message, e.Code)
+}
+
+func (e InvalidTokenException) Error() string {
+	return fmt.Sprintf("Error: %s (Code: %d)", e.Message, e.Code)
+}
+
+
 func NewJwtClaims(token_id, clientId string, userId *string, scopes []string, tokenType string) *CustomClaims{
 	expiredAt := time.Now().Add(2 * time.Hour)
+
 
 	if tokenType == model.TOKEN_TYPE_CLIENT_REFRESH_TOKEN || tokenType ==  model.TOKEN_TYPE_USER_REFRESH_TOKEN {
 		expiredAt = time.Now().Add((24 * 60) * time.Hour)
@@ -82,33 +102,48 @@ func ParseToken(tokenStr string) *CustomClaims {
 	if !token.Valid {
 		return nil
 	}
-	fmt.Println(customClaims)
 	return &customClaims
 }
 
-func VerifyJwtToken(token *CustomClaims, tokenType string) bool {	
+func VerifyJwtToken(token *CustomClaims, tokenType string) (model.UserableInterface, error) {	
 	
 	if !helpers.ContainsInSlice(tokenType, []string{ 
 		model.TOKEN_TYPE_USER_ACCESS_TOKEN,  
-		model.TOKEN_TYPE_USER_REFRESH_TOKEN, 
-		model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN,  
-		model.TOKEN_TYPE_CLIENT_REFRESH_TOKEN})  {
-		return false
+		model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN})  {
+		return nil, &InvalidTokenException{
+			Message: "invalid token provided",
+			Code: 403,
+		}
 	}
+	user, err := validateCustomClaims(token)
 
-	return !validateCustomClaims(token)
+	if err != nil {
+		return nil, err
+	}
+	
+	return *user, nil
 }
 
-func validateCustomClaims(claims *CustomClaims) bool {
+func validateCustomClaims(claims *CustomClaims) (*model.UserableInterface, error) {
     
     oAuthToken := model.GetOAuthTokenById(claims.TokenId)
     if oAuthToken == nil {
-        return false
+        return nil, errors.New("token not found")
     }
 
-	if oAuthToken.ExpiredAt.After(time.Now()) {
-		return false
+	location, _ := time.LoadLocation("Asia/Dhaka")
+	if oAuthToken.ExpiredAt.In(location).Before(time.Now().In(location)) {
+		return nil, &TokenExpiredException{
+			Message: "Token Expired",
+			Code: 403,
+		}
 	}	
+	var user model.UserableInterface
+	if oAuthToken.TokenType == model.TOKEN_TYPE_USER_ACCESS_TOKEN {
+		user = model.GetUserById(oAuthToken.UserId)		
+	} else {
+		user = model.GetClientById(oAuthToken.ClientId)		
+	}
 
-    return false
+    return &user, nil
 }
