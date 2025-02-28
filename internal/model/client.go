@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/tanjed/go-sso/internal/config"
-	"github.com/tanjed/go-sso/internal/db"
+	"github.com/tanjed/go-sso/apiservice"
+	"github.com/tanjed/go-sso/internal/db/redisdb"
 	"github.com/tanjed/go-sso/pkg/hashutilities"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -55,9 +55,9 @@ func (e ClientUnAuthorizedError) Error() string {
 }
 
 func (c *Client) Insert() bool {
-	db := db.InitDB()
+	app := apiservice.GetApp()
 	hashedPassword := hashutilities.GenerateHashFromString(c.ClientSecret)
-	collection := db.Conn.Database(config.AppConfig.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
 	res, err := collection.InsertOne(ctx, Client{
@@ -101,8 +101,7 @@ func AuthenticateClient(clientName string, clientSecret string) (*Client, error)
 func GetClientByClientName(clientName string) *Client {
 	var client Client
 	cacheKey := "SSO_CLIENT:" + clientName
-
-	if err := db.RedisGetToStruct(cacheKey, &client); err != nil {
+	if err := redisdb.RedisGetToStruct(cacheKey, &client); err != nil {
 		if err != redis.Nil {
 			slog.Error("Unable to get data from redis", "error", err)
 		}
@@ -110,13 +109,12 @@ func GetClientByClientName(clientName string) *Client {
 		
 		return &client
 	}
-
-	dbConn := db.InitDB()
+	app := apiservice.GetApp()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
 	
-	collection := dbConn.Conn.Database(config.AppConfig.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
 	err := collection.FindOne(ctx, bson.D{{"client_name", clientName}}).Decode(&client)
 
 	if err != nil {
@@ -124,7 +122,7 @@ func GetClientByClientName(clientName string) *Client {
 		return nil
 	}
 	
-	if err := db.RedisSetToStruct(cacheKey, &client, (1 * time.Hour)); err != nil {
+	if err := redisdb.RedisSetToStruct(cacheKey, &client, (1 * time.Hour)); err != nil {
 		slog.Error("Unable to set data to redis", "error", err)
 	}
 	return &client
@@ -134,7 +132,7 @@ func GetClientById(clientId string) *Client {
 	var client Client
 	cacheKey := "SSO_CLIENT_BY_CLIENT_ID:" + clientId
 
-	if err := db.RedisGetToStruct(cacheKey, &client); err != nil {
+	if err := redisdb.RedisGetToStruct(cacheKey, &client); err != nil {
 		if err != redis.Nil {
 			slog.Error("Unable to get data from redis", "error", err)
 		}
@@ -143,12 +141,12 @@ func GetClientById(clientId string) *Client {
 		return &client
 	}
 
-	dbConn := db.InitDB()
+	app := apiservice.GetApp()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
 	
-	collection := dbConn.Conn.Database(config.AppConfig.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(CLIENT_COLLECTION_NAME)
 	err := collection.FindOne(ctx, bson.D{{"client_id", clientId}}).Decode(&client)
 
 	if err != nil {
@@ -156,7 +154,7 @@ func GetClientById(clientId string) *Client {
 		return nil
 	}
 	
-	if err := db.RedisSetToStruct(cacheKey, &client, (1 * time.Hour)); err != nil {
+	if err := redisdb.RedisSetToStruct(cacheKey, &client, (1 * time.Hour)); err != nil {
 		slog.Error("Unable to set data to redis", "error", err)
 	}
 	return &client

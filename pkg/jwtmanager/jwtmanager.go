@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/tanjed/go-sso/internal/config"
+	"github.com/tanjed/go-sso/apiservice"
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/helpers"
 )
 
-var JWT_SECRET = config.AppConfig.JWT_SECRET
 
 
 type CustomClaims struct {
@@ -71,7 +70,7 @@ func NewJwtClaims(token_id, clientId string, userId *string, scopes []string, to
 
 
 func NewJwtToken(claims *CustomClaims) (string, error){
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(JWT_SECRET))
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(apiservice.GetApp().Config.JWT_SECRET))
 
 	if err != nil {
 		slog.Error("Unable to generate JWT", "error", err)
@@ -91,8 +90,9 @@ func NewJwtToken(claims *CustomClaims) (string, error){
 
 func ParseToken(tokenStr string) *CustomClaims {
 	var customClaims CustomClaims
+	app := apiservice.GetApp()
 	token, err := jwt.ParseWithClaims(tokenStr, &customClaims, func(token *jwt.Token) (interface{}, error) {
-        return []byte(JWT_SECRET), nil
+        return []byte(app.Config.JWT_SECRET), nil
     })
 	
 	if err != nil{
@@ -138,6 +138,14 @@ func validateCustomClaims(claims *CustomClaims) (*model.UserableInterface, error
 			Code: 403,
 		}
 	}	
+
+	if oAuthToken.Revoked == 1 {
+		return nil, &TokenExpiredException{
+			Message: "Token Expired",
+			Code: 403,
+		}
+	}
+	
 	var user model.UserableInterface
 	if oAuthToken.TokenType == model.TOKEN_TYPE_USER_ACCESS_TOKEN {
 		user = model.GetUserById(oAuthToken.UserId)		

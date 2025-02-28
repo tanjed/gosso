@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	Port string `json:"PORT"`
+	Port int `json:"PORT"`
 	DB_HOST string `json:"DB_HOST"`
 	DB_PORT int `json:"DB_PORT"`
 	DB_USER string `json:"DB_USER"`
@@ -19,19 +19,24 @@ type Config struct {
 	REDIS_PORT int `json:"REDIS_PORT"`
 }
 
-var AppConfig Config
 
-func Load() {
-		
+func NewConfig() *Config{
+	var appConfig Config
 	content, err := os.ReadFile("internal/config/config.json")
 
 	if err != nil {
 		log.Fatalf("Error reading config file: %v", err)
 	}
 
-	err = json.Unmarshal(content, &AppConfig)
+	err = json.Unmarshal(content, &appConfig)
 
 	if err != nil {
 		log.Fatalf("Error unmarshaling config: %v", err)
 	}
+
+	return &appConfig
+}
+
+func (c *Config) Close() {
+	c = &Config{}
 }

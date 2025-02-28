@@ -1,15 +1,13 @@
-package db
+package redisdb
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"math/rand"
 	"reflect"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -17,34 +15,32 @@ import (
 )
 
 type Redis struct {
-	Id int
+	id int
 	Conn *redis.Client
 }
 
-var redisInstance *Redis
-var redisIntanceOnce sync.Once
+var conn *redis.Client
 
-func InitRedis() *Redis {
-	redisIntanceOnce.Do(func ()  {
-		redisInstance = &Redis{
-			Id: rand.Intn(101),
-			Conn : redis.NewClient(&redis.Options{
-				Addr:    config.AppConfig.REDIS_HOST+":"+strconv.Itoa(config.AppConfig.REDIS_PORT),
+func NewRedis(c *config.Config) *Redis {
+	 client := Redis{
+			id: rand.Intn(101),
+			Conn: redis.NewClient(&redis.Options{
+				Addr:    c.REDIS_HOST+":"+strconv.Itoa(c.REDIS_PORT),
 				Password: "",
 				DB:       0,
-				PoolSize:     500,                                     // Maximum number of connections in the pool
-				MinIdleConns: 50,                                      // Minimum idle connections                     // Idle timeout for connections
-				MaxRetries:   3,                                      // Retry count for failed commands
-			}),
-		}
-	})
-	fmt.Println("REDIS CONNECTION ID:", redisInstance.Id)
-	return redisInstance
+				PoolSize:     500,                                     
+				MinIdleConns: 50,                                           
+				MaxRetries:   3,
+		}),
+	}
+
+	conn = client.Conn
+	return &client
 }
 
-func CloseRedis() {
-	if redisInstance != nil && redisInstance.Conn != nil {
-		redisInstance.Conn.Close()
+func (c Redis) Close() {
+	if c.Conn != nil {
+		c.Conn.Close()
 	}
 }
 
@@ -55,10 +51,8 @@ func RedisGetToStruct(key string, model interface{}) (error) {
 		slog.Error("Invalid struct type given")
 		return errors.New("invalid struct type given")
 	}
-
-	rdb := InitRedis()
-
-	m, err := rdb.Conn.Get(context.Background(), key).Result()
+	
+	m, err := conn.Get(context.Background(), key).Result()
 
 	if err != nil && err != redis.Nil {
 		slog.Error("Unable to fetch data from redis", "error", err)
@@ -87,9 +81,7 @@ func RedisSetToStruct(key string, model interface{}, ttl time.Duration) error {
 		return err
 	}
 
-	rdb := InitRedis()
-
-	err = rdb.Conn.Set(context.Background(), key, jsonData, ttl).Err()
+	err = conn.Set(context.Background(), key, jsonData, ttl).Err()
 	if err != nil {
 		slog.Error("Unable to set to redis", "error", err)
 		return errors.New("unable to set to redis")

@@ -7,27 +7,23 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
-	"github.com/tanjed/go-sso/internal/config"
-	"github.com/tanjed/go-sso/internal/db"
+	"github.com/tanjed/go-sso/apiservice"
 	"github.com/tanjed/go-sso/internal/route"
 )
 
+
 func main() {
-	config.Load()
-
-	db.InitDB()
-	db.InitRedis()
-
-	defer db.CloseDB()
-	defer db.CloseRedis()
+	apiServiceContainer := apiservice.NewApiService()
+	apiServiceContainer.Boot()
 	
-	r := route.Load()
-	server := http.Server{
-		Addr: ":" + config.AppConfig.Port,
-		Handler: r  ,
+	app := apiservice.GetApp()
+	server := &http.Server{
+		Addr: ":" + strconv.Itoa(app.Config.Port),
+		Handler: route.NewRouter()  ,
 	}
 	
 	done := make(chan os.Signal, 1)
@@ -45,7 +41,7 @@ func main() {
 	
 	slog.Info("Initiating Server Shutdown Process")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
 
 	err := server.Shutdown(ctx)
@@ -53,6 +49,7 @@ func main() {
 	if err != nil {
 		slog.Error("Unable to shoutdown server", "ERROR", err)
 	}
-
-
+	
+	apiServiceContainer.Destroy()
 }
+

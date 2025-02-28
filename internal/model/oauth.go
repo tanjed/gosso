@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tanjed/go-sso/internal/config"
-	"github.com/tanjed/go-sso/internal/db"
+	"github.com/tanjed/go-sso/apiservice"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 const TOKEN_COLLECTION_NAME = "oauth_tokens"
@@ -29,11 +28,11 @@ type OauthToken struct {
 }
 
 func (t *OauthToken) Insert() bool {
-	db := db.InitDB()
-	collection := db.Conn.Database(config.AppConfig.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
+	app := apiservice.GetApp()
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
-	
+
 	res, err := collection.InsertOne(ctx, t)
 
 	if err != nil {
@@ -45,8 +44,8 @@ func (t *OauthToken) Insert() bool {
 }
 
 func (t *OauthToken) InvokeToken() bool{
-	db := db.InitDB()
-	collection := db.Conn.Database(config.AppConfig.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
+	app := apiservice.GetApp()
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
 	res, err := collection.UpdateOne(ctx, bson.D{{"token_id", t.TokenId}}, bson.D{
@@ -58,16 +57,16 @@ func (t *OauthToken) InvokeToken() bool{
 		slog.Error("Unable to invoke token", "error", err)
 		return false
 	}
-	
+
 	return res.Acknowledged
 }
 
 func GetOAuthTokenById(tokenId string) *OauthToken{
-	db := db.InitDB()
+	app := apiservice.GetApp()
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
 	var token OauthToken
-	collection := db.Conn.Database(config.AppConfig.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
 	err := collection.FindOne(ctx, bson.D{{"token_id", tokenId}}).Decode(&token)
 
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 
 func main() {
 	fmt.Println("Initiating client seeder")
-	config.Load()
+	config.NewConfig()
 	client := model.NewClient(uuid.New().String(), "search_service", "secret")
 	fmt.Println(client.Insert())
 	
