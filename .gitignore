@@ -1,4 +1,2 @@
-docker/db/pg/data
-docker/db/cassandra/data
-docker/db/mongodb/data
 tmp
+docker/db/*

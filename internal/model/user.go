@@ -107,14 +107,14 @@ func GetUserByMobileNumber(mobileNumber string) *User {
 	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(USER_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
-	err := collection.FindOne(ctx, bson.D{{"mobile_number", mobileNumber}}).Decode(&user)
+	err := collection.FindOne(ctx, bson.D{{Key: "mobile_number", Value: mobileNumber}}).Decode(&user)
 
 	if err != nil {
 		log.Println("Unable to fetch result", err)
 		return nil
 	}
 
-	if err := redisdb.RedisSetToStruct(cacheKey, &user, (1 * time.Hour)); err != nil {
+	if err := redisdb.RedisSetToStruct(cacheKey, &user, (1 * time.Second)); err != nil {
 		slog.Error("Unable to set data to redis", "error", err)
 	}
 
@@ -138,7 +138,7 @@ func GetUserById(userId string) *User {
 	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(USER_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
-	err := collection.FindOne(ctx, bson.D{{"user_id", userId}}).Decode(&user)
+	err := collection.FindOne(ctx, bson.D{{Key:"user_id", Value: userId}}).Decode(&user)
 
 	if err != nil {
 		log.Println("Unable to fetch result", err)
@@ -150,6 +150,25 @@ func GetUserById(userId string) *User {
 	}
 
 	return &user
+}
+
+func (u *User) UpdatePassword(newPassword string) (bool){
+	hashedPassword := hashutilities.GenerateHashFromString(newPassword)
+	app := apiservice.GetApp()
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(USER_COLLECTION_NAME)
+	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	defer cancel()
+
+	res, err := collection.UpdateOne(ctx, bson.D{{Key: "user_id", Value: u.UserId}}, bson.D{
+		{Key: "$set", Value: bson.D{{Key:"password", Value: hashedPassword}}},
+	})
+
+	if err != nil {
+		log.Println("Unable to update", err)
+		return false
+	}
+
+	return res.Acknowledged
 }
 
 func NewUser(firstName, lastName, mobileNumber, password string) *User {
