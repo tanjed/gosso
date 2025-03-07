@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"time"
 
+	"github.com/tanjed/go-sso/internal/customerror"
 	"github.com/tanjed/go-sso/internal/model"
 )
 
@@ -37,4 +39,71 @@ func GeneratePasswordResetToken() string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+
+func IsReadyToSendOtp(user *model.User, requestType string, isResend bool) (error){
+	if user == nil {
+		return &customerror.UserNotFoundError{
+			ErrMessage: "user not found",
+			ErrCode: 404,
+		}
+	}
+
+	sentOtpCount, err := model.GetUserSentOtpCount(user.UserId, requestType)
+
+	if err != nil {
+		return &customerror.DBReadError{
+			ErrMessage: "unable to read user otp count",
+			ErrCode: http.StatusInternalServerError, 
+		}
+	}
+
+	if sentOtpCount >= model.MAX_RETRY_COUNT {
+		return &customerror.OtpLimitReachedError{
+			ErrMessage: "max retry limit reached",
+			ErrCode: http.StatusTooManyRequests,
+		}
+	}
+
+	validSentOtp, _ := model.GetUserValidOtp(user.UserId, model.OTP_TYPE_PASSWORD_RESET)
+
+	if !isResend && validSentOtp != nil {	
+		return &customerror.OtpLimitReachedError{
+			ErrMessage: "otp already sent",
+			ErrCode: http.StatusTooManyRequests,
+		}
+	}
+
+	return nil
+}
+
+
+func ValidateOtp(userId string, requestOtp string, otpType string) (*model.PasswordReset, error) {
+	otp, err := model.GetUserValidOtp(userId, otpType)
+
+	if err != nil {
+		return nil, &customerror.OtpNotFoundError{
+			ErrMessage: "otp not found",
+			ErrCode: http.StatusUnprocessableEntity,
+		}
+	}
+
+	if otp.Otp != requestOtp {
+		return nil, &customerror.OtpMismatchError{
+			ErrMessage: "otp mismatched",
+			ErrCode: http.StatusUnprocessableEntity,
+		}
+	}
+
+	passwordReset := model.NewPasswordReset(userId, GeneratePasswordResetToken())
+	
+	if !otp.MarkAsValidated() || !passwordReset.Insert() {
+		return nil, &customerror.OtpMismatchError{
+			ErrMessage: "something went wrong",
+			ErrCode: http.StatusInternalServerError,
+		}
+	}
+
+	return passwordReset, nil
 }

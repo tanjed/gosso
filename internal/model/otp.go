@@ -14,6 +14,8 @@ const OTP_COLLECTION_NAME = "otps"
 
 const OTP_TYPE_PASSWORD_RESET = "password_reset"
 
+const MAX_RETRY_COUNT = 3
+
 type Otp struct {
 	OtpId string `bson:"otp_id"`
 	UserId string `bson:"user_id"`
@@ -88,11 +90,11 @@ func GetUserSentOtpCount(userId, otpType string) (int64, error) {
 	todayEndTime := todayStartTime.Add(24 * time.Hour)
 
 	count, err := collection.CountDocuments(ctx, bson.D{
-		{ "expired_at", bson.D{{ "$gte",  time.Now()}}},
-		{ "created_at", bson.D{{ "$gte",  todayStartTime}, { "$lte",  todayEndTime}}},
-		{ "user_id", userId},	
-		{ "is_validated", 0},
-		{ "otp_type", otpType},
+		{Key: "expired_at",Value: bson.D{{Key: "$gte",Value:  time.Now()}}},
+		{Key: "created_at",Value: bson.D{{Key: "$gte",Value:  todayStartTime}, {Key: "$lte",Value: todayEndTime}}},
+		{Key: "user_id",Value: userId},	
+		{Key: "is_validated",Value: 0},
+		{Key: "otp_type",Value: otpType},
 	})
 
 	if err != nil {

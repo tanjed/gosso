@@ -61,11 +61,36 @@ func GetUserValidResetToken(userId string) (*PasswordReset, error) {
 	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(RESET_PASSWORD_COLLECTION_NAME)
 	var reset PasswordReset
 	err := collection.FindOne(ctx, bson.D{
-		{"user_id",  userId},
-		{"is_validated", 0},
-		{"expired_at", bson.D{{"$gte",  time.Now()}}},
+		{Key: "user_id",  Value: userId},
+		{Key: "is_validated", Value: 0},
+		{Key: "expired_at", Value: bson.D{{Key: "$gte", Value: time.Now()}}},
 	}, options.FindOne().SetSort(bson.D{
-		{ "created_at",  -1},
+		{Key: "created_at", Value: -1},
+	})).Decode(&reset)
+
+
+	if err != nil {
+		slog.Error("invalid reset token", "error", err)
+		return nil, err
+	}
+
+	return &reset, nil
+}
+
+
+func GetResetTokenById(tokenId string) (*PasswordReset, error) {
+	app := apiservice.GetApp()
+	ctx, cancel := context.WithTimeout(context.Background(), (5 * time.Second))
+	defer cancel()
+
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(RESET_PASSWORD_COLLECTION_NAME)
+	var reset PasswordReset
+	err := collection.FindOne(ctx, bson.D{
+		{Key: "token_id",  Value: tokenId},
+		{Key: "is_validated", Value: 0},
+		{Key: "expired_at", Value: bson.D{{Key: "$gte", Value: time.Now()}}},
+	}, options.FindOne().SetSort(bson.D{
+		{Key: "created_at", Value: -1},
 	})).Decode(&reset)
 
 

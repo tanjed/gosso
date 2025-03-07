@@ -14,7 +14,7 @@ import (
 type ResetRequest struct {
 	IsResend bool `json:"is_resend,omitempty"`
 }
-const MAX_RETRY_COUNT = 3
+
 
 func RequestHandler(w http.ResponseWriter, r *http.Request) {
 	var resetRequest ResetRequest
@@ -41,35 +41,13 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := r.Context().Value(model.AUTH_USER_CONTEXT_KEY).(*model.User)
 
-	if user == nil {
-		responsemanager.ResponseOK(&w, map[string]interface{}{
-			"message" : "otp sent",
-		})
+	if err := otpservice.IsReadyToSendOtp(user, model.OTP_TYPE_PASSWORD_RESET, resetRequest.IsResend); err != nil {
+		responsemanager.ResponseWithCode(&w, err)
 		return
 	}
 
-	sentOtpCount, err := model.GetUserSentOtpCount(user.UserId, model.OTP_TYPE_PASSWORD_RESET)
 
-	if err != nil {
-		responsemanager.ResponseServerError(&w, "something went wrong")
-		return
-	}
-
-	if sentOtpCount >= MAX_RETRY_COUNT {
-		responsemanager.ResponseUnprocessableEntity(&w, "max retry limit reached")
-		return
-	}
-
-	validSentOtp, _ := model.GetUserValidOtp(user.UserId, model.OTP_TYPE_PASSWORD_RESET)
-
-	if !resetRequest.IsResend && validSentOtp != nil {	
-		responsemanager.ResponseUnprocessableEntity(&w, "otp already sent")
-		return
-	}
-
-	err = otpservice.SendResetOtp(user.UserId, model.OTP_TYPE_PASSWORD_RESET)
-
-	if err != nil {
+	if err := otpservice.SendResetOtp(user.UserId, model.OTP_TYPE_PASSWORD_RESET); err != nil {
 		responsemanager.ResponseServerError(&w, "something went wrong")
 		return
 	}

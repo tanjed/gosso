@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/tanjed/go-sso/internal/customerror"
 )
 
 func ResponseOK(w *http.ResponseWriter, data interface{}) {
@@ -60,4 +61,18 @@ func ResponseValidationError(w *http.ResponseWriter, errors validator.Validation
 	json.NewEncoder(responseWriter).Encode(map[string]interface{}{
 		"errors" : validationErrors,
 	})
+}
+
+
+func ResponseWithCode(w *http.ResponseWriter, err error) {
+	if errableElement, ok := err.(customerror.ErrorableInterface); ok {
+		switch errableElement.Code() {
+		case http.StatusUnprocessableEntity :
+			ResponseUnprocessableEntity(w, errableElement.Message())
+		default :
+			ResponseServerError(w, errableElement.Message())
+		}
+	}else {
+		ResponseServerError(w, err.Error())
+	}
 }

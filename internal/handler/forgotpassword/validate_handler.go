@@ -1,4 +1,4 @@
-package resetpassword
+package forgotpassword
 
 import (
 	"encoding/json"
@@ -12,7 +12,8 @@ import (
 )
 
 type ValidateRequest struct {
-	Otp string
+	MobileNumber string `json:"mobile_number"`
+	Otp string `json:"otp"`
 }
 
 func ValidateHandler(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +37,7 @@ func ValidateHandler(w http.ResponseWriter, r *http.Request) {
     }
 	
 
-	user := r.Context().Value(model.AUTH_USER_CONTEXT_KEY).(*model.User)
+	user := model.GetUserByMobileNumber(validateRequest.MobileNumber)
 
 	if user == nil {
 		responsemanager.ResponseUnAuthorized(&w, "otp can not be verified")
@@ -49,7 +50,7 @@ func ValidateHandler(w http.ResponseWriter, r *http.Request) {
 		responsemanager.ResponseWithCode(&w, err)
 		return
 	}
-
+	
 	responsemanager.ResponseOK(&w, map[string]interface{}{
 		"token" : passwordReset.Token,
 		"expires_at" : passwordReset.ExpiredAt.Unix(),
