@@ -21,3 +21,14 @@ func (e UserNotFoundError) Message() string{
 
 
 
+type UserUnauthorizedError struct {
+	ErrMessage string
+	ErrCode int
+}
+
+func (e UserUnauthorizedError) Error() string {
+	return fmt.Sprintf("Error: %s (Code: %d)", e.ErrMessage, e.ErrCode)
+}
+
+
+

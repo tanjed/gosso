@@ -15,6 +15,7 @@ const GRANT_TYPE_REFRESH_TOKEN = "refresh_token"
 const GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 
 type TokenRequest struct {
+	// ClientId bson.ObjectID `json:"client_id" validate:"required"`
 	GrantType string 	`json:"grant_type" validate:"required"`
 }
 

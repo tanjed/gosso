@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/jwtmanager"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
@@ -55,7 +54,7 @@ func refreshTokenGrantHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), oAuthToken.ClientId,
+	accessTokenClaims := jwtmanager.NewJwtClaims(oAuthToken.ClientId,
 			&oAuthToken.UserId, oAuthToken.Scopes, parsedToken.TokenType)
 
 	accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)

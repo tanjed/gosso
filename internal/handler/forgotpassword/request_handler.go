@@ -36,7 +36,11 @@ func RequestHandler(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	
-	user := model.GetUserByMobileNumber(forgotPasswordRequest.MobileNumber)
+	user, err := model.GetUserByMobileNumber(forgotPasswordRequest.MobileNumber)
+	if err != nil {
+		responsemanager.ResponseServerError(&w, "something went wrong")
+		return
+	}
 
 	if err := otpservice.IsReadyToSendOtp(user, model.OTP_TYPE_PASSWORD_RESET, forgotPasswordRequest.IsResend); err != nil {
 		responsemanager.ResponseWithCode(&w, err)

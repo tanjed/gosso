@@ -13,7 +13,6 @@ func UserProfileHandler(w http.ResponseWriter, r *http.Request) {
 	if client, ok := authUser.(*model.Client); ok {
 		responsePayload = map[string]interface{}{
 			"client_id" : client.ClientId,
-			"client_name" : client.ClientName,
 		}
 	} 
 

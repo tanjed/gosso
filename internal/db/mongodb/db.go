@@ -22,7 +22,6 @@ type DB struct {
 
 
 func NewDB(c *config.Config) *DB{
-
 	client, err := mongo.Connect(options.Client().ApplyURI(getConnectionString(*c)))
 
 	if err != nil {

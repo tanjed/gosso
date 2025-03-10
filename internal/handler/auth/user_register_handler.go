@@ -1,72 +1,55 @@
 package auth
 
 import (
-	"encoding/json"
-	"log"
-	"log/slog"
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/tanjed/go-sso/internal/customerror"
+	"github.com/tanjed/go-sso/internal/handler/customtype"
 	"github.com/tanjed/go-sso/internal/model"
-	"github.com/tanjed/go-sso/internal/validation"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-type UserRegisterRequest struct {
-	ClientName string `json:"client_name" validate:"required"`
-	ClientSecret string `json:"client_secret" validate:"required"`
-	FirstName string `json:"first_name" validate:"required"`
-	LastName string `json:"last_name" validate:"required"`
-	MobileNumber string `json:"mobile_number" validate:"required"`
-	Password string `json:"password" validate:"required"`
-}
-
 func UserRegisterHandler(w http.ResponseWriter, r *http.Request) {
-	var userRegisterRequest UserRegisterRequest
+	var userRegisterRequest customtype.UserRegisterRequest
 	
-	if err := json.NewDecoder(r.Body).Decode(&userRegisterRequest); err != nil {
-		slog.Error("Unable to process the request", "error", err)
-		responsemanager.ResponseUnprocessableEntity(&w, "Unable to process the request")
+	if err := userRegisterRequest.Validated(r.Body); err != nil {
+		responsemanager.ResponseUnprocessableEntity(&w, customtype.I{
+			"message" : err.Error(),
+			"bag" : err.(*customerror.ValidationError).ErrBag,
+		})
         return
 	}
 
-	validate := validator.New()
-	validate.RegisterValidation("mobileno", validation.ValidateMobile)
-	if err := validate.Struct(userRegisterRequest); err != nil {
-		if errors, ok := err.(validator.ValidationErrors); ok {
-			responsemanager.ResponseValidationError(&w, errors)
-		} else {
-			slog.Error("Unable to process the request", "error", err)
-			responsemanager.ResponseUnprocessableEntity(&w, "Unable to process the request")
-		}
-		return
-    }
-
-	if _, err := model.AuthenticateClient(userRegisterRequest.ClientName, userRegisterRequest.ClientSecret); err != nil {
-		responsemanager.ResponseUnAuthorized(&w, "Invalid client credentials")
+	if _, err := model.GetClientById(userRegisterRequest.ClientId); err != nil {
+		responsemanager.ResponseUnAuthorized(&w, customtype.M{"message" : "invalid client"})
 		return
 	}
 
-	if existingUser := model.GetUserByMobileNumber(userRegisterRequest.MobileNumber); existingUser != nil {
-		log.Println(existingUser)
-		responsemanager.ResponseUnprocessableEntity(&w,"User already exists")
+	exists, err := model.GetUserByMobileNumber(userRegisterRequest.MobileNumber);
+	if err != nil && err != mongo.ErrNoDocuments{
+		responsemanager.ResponseServerError(&w, customtype.M{"message" : "something went wrong"})
 		return
 	}
 
-	user := model.NewUser(userRegisterRequest.FirstName, userRegisterRequest.LastName, userRegisterRequest.MobileNumber, userRegisterRequest.Password)
- 
+	if exists != nil {
+		responsemanager.ResponseUnprocessableEntity(&w, customtype.M{"message" : "user already exists"})
+		return
+	}
+
+	user := model.NewUser(userRegisterRequest)
 	if !user.Insert() {
-		responsemanager.ResponseServerError(&w, "Unable to create user")
+		responsemanager.ResponseServerError(&w, customtype.M{"message" : "unable to create user"})
 		return
 	}
 
-	createdUser := model.GetUserByMobileNumber(userRegisterRequest.MobileNumber)
-	responsemanager.ResponseOK(&w, map[string]interface{}{
-		"user" : map[string]interface{}{
-			"user_id" : createdUser.UserId,
-			"first_name" : createdUser.FirstName,
-			"last_name" : createdUser.LastName,
-			"mobile_number" : createdUser.MobileNumber,
+	responsemanager.ResponseOK(&w, customtype.I{
+		"user" : customtype.I{
+			"user_id" : user.UserId,
+			"first_name" : user.FirstName,
+			"last_name" : user.LastName,
+			"mobile_number" : user.MobileNumber,
+			"email" : user.Email,
 		},
 	})
 }

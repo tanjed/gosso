@@ -9,10 +9,11 @@ import (
 
 	"github.com/tanjed/go-sso/internal/customerror"
 	"github.com/tanjed/go-sso/internal/model"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 
-func SendResetOtp(userId string, otpType string) error{
+func SendResetOtp(userId bson.ObjectID, otpType string) error{
 	otp := model.NewOtp(userId, GenerateOTP(), otpType)
 	if !otp.Insert() {
 		return errors.New("unable to store otp")
@@ -79,7 +80,7 @@ func IsReadyToSendOtp(user *model.User, requestType string, isResend bool) (erro
 }
 
 
-func ValidateOtp(userId string, requestOtp string, otpType string) (*model.PasswordReset, error) {
+func ValidateOtp(userId bson.ObjectID, requestOtp string, otpType string) (*model.PasswordReset, error) {
 	otp, err := model.GetUserValidOtp(userId, otpType)
 
 	if err != nil {

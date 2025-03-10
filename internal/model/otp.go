@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/tanjed/go-sso/apiservice"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -17,8 +16,8 @@ const OTP_TYPE_PASSWORD_RESET = "password_reset"
 const MAX_RETRY_COUNT = 3
 
 type Otp struct {
-	OtpId string `bson:"otp_id"`
-	UserId string `bson:"user_id"`
+	OtpId bson.ObjectID `bson:"_id"`
+	UserId bson.ObjectID `bson:"user_id"`
 	Otp string `bson:"otp"`
 	OtpType string `bson:"otp_type"`
 	IsValidated int `bson:"is_validated"`
@@ -27,9 +26,9 @@ type Otp struct {
 	CreatedAt time.Time `bson:"created_at"`
 }
 
-func NewOtp(userId, otp, otpType string) *Otp{	
+func NewOtp(userId bson.ObjectID, otp, otpType string) *Otp{	
 	return &Otp{
-		OtpId: uuid.New().String(),
+		OtpId: bson.NewObjectID(),
 		UserId: userId,
 		Otp: otp,
 		OtpType: otpType,
@@ -79,7 +78,7 @@ func (o *Otp) MarkAsValidated() bool {
 	return res.Acknowledged
 }
 
-func GetUserSentOtpCount(userId, otpType string) (int64, error) {
+func GetUserSentOtpCount(userId bson.ObjectID, otpType string) (int64, error) {
 	app := apiservice.GetApp()
 	ctx, cancel := context.WithTimeout(context.Background(), (5 * time.Second))
 	defer cancel()
@@ -106,7 +105,7 @@ func GetUserSentOtpCount(userId, otpType string) (int64, error) {
 }
 
 
-func GetUserValidOtp(userId, otpType string) (*Otp, error) {
+func GetUserValidOtp(userId bson.ObjectID, otpType string) (*Otp, error) {
 	app := apiservice.GetApp()
 	ctx, cancel := context.WithTimeout(context.Background(), (5 * time.Second))
 	defer cancel()

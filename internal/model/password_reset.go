@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/tanjed/go-sso/apiservice"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -16,8 +15,8 @@ import (
 const RESET_PASSWORD_COLLECTION_NAME = "password_resets"
 
 type PasswordReset struct {
-	ResetId string `json:"reset_id" bson:"reset_id"`
-	UserId string `json:"user_id" bson:"user_id"`
+	ResetId bson.ObjectID `json:"reset_id" bson:"_id"`
+	UserId bson.ObjectID `json:"user_id" bson:"user_id"`
 	Token string `json:"token" bson:"token"`
 	ExpiredAt time.Time `json:"expired_at" bson:"expired_at"`
 	IsValidated int `json:"is_validated" bson:"is_validated"`
@@ -25,9 +24,9 @@ type PasswordReset struct {
 	Created_at time.Time `json:"created_at" bson:"created_at"`
 }
 
-func NewPasswordReset(userId, token string) *PasswordReset {
+func NewPasswordReset(userId bson.ObjectID, token string) *PasswordReset {
 	return &PasswordReset{
-		ResetId: uuid.New().String(),
+		ResetId: bson.NewObjectID(),
 		UserId: userId,
 		Token: token,
 		ExpiredAt: time.Now().Add(10 * time.Minute),
@@ -53,7 +52,7 @@ func (p *PasswordReset) Insert() bool {
 }
 
 
-func GetUserValidResetToken(userId string) (*PasswordReset, error) {
+func GetUserValidResetToken(userId bson.ObjectID) (*PasswordReset, error) {
 	app := apiservice.GetApp()
 	ctx, cancel := context.WithTimeout(context.Background(), (5 * time.Second))
 	defer cancel()

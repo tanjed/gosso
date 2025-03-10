@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/tanjed/go-sso/internal/config"
 	"github.com/tanjed/go-sso/internal/model"
 )
@@ -11,7 +10,8 @@ import (
 func main() {
 	fmt.Println("Initiating client seeder")
 	config.NewConfig()
-	client := model.NewClient(uuid.New().String(), "search_service", "secret")
+	client := model.NewClient("search_service", "secret")
+	fmt.Println(client)
 	fmt.Println(client.Insert())
 	
 	// migrationQueries := db.RegisterMigrationQueries()

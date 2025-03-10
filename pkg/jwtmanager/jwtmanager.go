@@ -10,14 +10,15 @@ import (
 	"github.com/tanjed/go-sso/apiservice"
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/helpers"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 
 
 type CustomClaims struct {
-	TokenId string
-	ClientId string
-	UserId string
+	TokenId bson.ObjectID
+	ClientId bson.ObjectID
+	UserId bson.ObjectID
 	Scopes []string
 	TokenType string
 	ExpAt time.Time
@@ -44,7 +45,7 @@ func (e InvalidTokenException) Error() string {
 }
 
 
-func NewJwtClaims(token_id, clientId string, userId *string, scopes []string, tokenType string) *CustomClaims{
+func NewJwtClaims(clientId bson.ObjectID, userId *bson.ObjectID, scopes []string, tokenType string) *CustomClaims{
 	expiredAt := time.Now().Add(2 * time.Hour)
 
 
@@ -53,7 +54,7 @@ func NewJwtClaims(token_id, clientId string, userId *string, scopes []string, to
 	}
 
 	return &CustomClaims{
-		TokenId: token_id,
+		TokenId: bson.NewObjectID(),
 		ClientId: clientId,
 		UserId: *userId,
 		Scopes: scopes,
@@ -78,7 +79,7 @@ func NewJwtToken(claims *CustomClaims) (string, error){
 	}
 
 
-	oauthTokenPayload := model.NewOauthToken(&claims.TokenId, claims.ClientId, claims.UserId, claims.Scopes, claims.TokenType, claims.ExpAt, claims.IssAt)
+	oauthTokenPayload := model.NewOauthToken(claims.ClientId, claims.UserId, claims.Scopes, claims.TokenType, claims.ExpAt, claims.IssAt)
 
 	if !oauthTokenPayload.Insert() {
 		slog.Error("Unable to store JWT", "error", err)
@@ -150,7 +151,7 @@ func validateCustomClaims(claims *CustomClaims) (*model.UserableInterface, error
 	if oAuthToken.TokenType == model.TOKEN_TYPE_USER_ACCESS_TOKEN {
 		user = model.GetUserById(oAuthToken.UserId)		
 	} else {
-		user = model.GetClientById(oAuthToken.ClientId)		
+		user, _ = model.GetClientById(oAuthToken.ClientId)		
 	}
 
     return &user, nil

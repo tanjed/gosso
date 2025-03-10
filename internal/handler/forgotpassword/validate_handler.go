@@ -37,7 +37,7 @@ func ValidateHandler(w http.ResponseWriter, r *http.Request) {
     }
 	
 
-	user := model.GetUserByMobileNumber(validateRequest.MobileNumber)
+	user, err := model.GetUserByMobileNumber(validateRequest.MobileNumber)
 
 	if user == nil {
 		responsemanager.ResponseUnAuthorized(&w, "otp can not be verified")

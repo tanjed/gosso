@@ -6,15 +6,15 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/jwtmanager"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type ClientCredentialsGrantRequest struct {
 	TokenRequest
-	ClientName string 	`json:"client_name" validate:"required"`
+	ClientId bson.ObjectID 	`json:"client_id" validate:"required"`
 	ClientSecret string `json:"client_secret" validate:"required"`
 	Scope []string 		`json:"scope" validate:"required"`
 }
@@ -42,7 +42,7 @@ func clientCredentialsGrantHandler(w http.ResponseWriter, r *http.Request) {
 		return
     }
 	
-	client, err := model.AuthenticateClient(clientCredentialsGrantRequest.ClientName, clientCredentialsGrantRequest.ClientSecret);
+	client, err := model.AuthenticateClient(clientCredentialsGrantRequest.ClientId, clientCredentialsGrantRequest.ClientSecret);
 	if err != nil {
 		responsemanager.ResponseUnAuthorized(&w, "Invalid client credentials")
 		return
@@ -58,7 +58,7 @@ func clientCredentialsGrantHandler(w http.ResponseWriter, r *http.Request) {
 	refreshTokenChan := make(chan tokenResponse)
 
 	go func ()  {
-		accessTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
+		accessTokenClaims := jwtmanager.NewJwtClaims(client.ClientId,
 			nil, clientCredentialsGrantRequest.Scope, model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN)
 
 			accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
@@ -72,7 +72,7 @@ func clientCredentialsGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 
 	go func ()  {
-		refreshTokenClaims := jwtmanager.NewJwtClaims(uuid.New().String(), client.ClientId,
+		refreshTokenClaims := jwtmanager.NewJwtClaims(client.ClientId,
 			nil, clientCredentialsGrantRequest.Scope, model.TOKEN_TYPE_CLIENT_REFRESH_TOKEN)
 
 		refreshToken, err := jwtmanager.NewJwtToken(refreshTokenClaims)		

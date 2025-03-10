@@ -45,3 +45,27 @@ func (e *ServerError) Code() int{
 func (e *ServerError) Message() string{
 	return e.ErrMessage
 }
+
+
+type ValidationError struct {
+	ErrMessage string
+	ErrCode int
+	ErrBag map[string][]string
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("Error: %s (Code: %d)", e.ErrMessage, e.ErrCode)
+}
+
+func (e *ValidationError) Code() int{
+	return e.ErrCode
+}
+
+func (e *ValidationError) Message() string{
+	return e.ErrMessage
+}
+
+
+func (e *ValidationError) ErrorBag() map[string][]string{
+	return e.ErrBag
+}
