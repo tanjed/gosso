@@ -47,9 +47,10 @@ func ConfirmHandler(w http.ResponseWriter, r *http.Request) {
 		responsemanager.ResponseUnprocessableEntity(&w, "invalid token")
 		return
 	}	
-
 	
-	if !reset.MarkAsValidated() && !model.GetUserById(reset.UserId).UpdatePassword(confirmRequest.NewPassword) {
+	u, _ := model.GetUserById(reset.UserId)
+	
+	if !reset.MarkAsValidated() && !u.UpdatePassword(confirmRequest.NewPassword) {
 		responsemanager.ResponseUnprocessableEntity(&w, "password not updated")
 		return
 	}

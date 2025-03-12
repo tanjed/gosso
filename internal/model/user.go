@@ -118,35 +118,37 @@ func GetUserByMobileNumber(mobileNumber string) (*User, error) {
 	return &user, nil
 }
 
-func GetUserById(userId bson.ObjectID) *User {
+func GetUserById(userId bson.ObjectID) (*User, error) {
 	var user User
-	cacheKey := "SSO_USER_BY_ID:" + userId.Hex()
+	
+	cacheKey := "SSO_USER_BY_USER_ID:" + userId.Hex()
 
 	if err := redisdb.RedisGetToStruct(cacheKey, &user); err != nil {
 		if err != redis.Nil {
-			slog.Error("Unable to get data from redis", "error", err)
+			slog.Error("unable to get data from redis", "error", err)
 		}
 	} else {
-
-		return &user
+		
+		return &user, nil
 	}
 
 	app := apiservice.GetApp()
-	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(USER_COLLECTION_NAME)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
-	err := collection.FindOne(ctx, bson.D{{Key:"user_id", Value: userId}}).Decode(&user)
+	
+	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(USER_COLLECTION_NAME)
+	err := collection.FindOne(ctx, bson.M{"_id": userId}).Decode(&user)
 
 	if err != nil {
-		log.Println("Unable to fetch result", err)
-		return nil
+		slog.Error("unable to fetch result", "error", err)
+		return nil, err
 	}
-
-	if err := redisdb.RedisSetToStruct(cacheKey, &user, (1 * time.Hour)); err != nil {
-		slog.Error("Unable to set data to redis", "error", err)
+	
+	if err := redisdb.RedisSetToStruct(cacheKey, &userId, (1 * time.Hour)); err != nil {
+		slog.Error("unable to set data to redis", "error", err)
 	}
-
-	return &user
+	return &user, nil
 }
 
 func (u *User) UpdatePassword(newPassword string) (bool){

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/tanjed/go-sso/internal/handler/customtype"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
 )
 
@@ -14,14 +15,10 @@ const GRANT_TYPE_PASSWORD = "password"
 const GRANT_TYPE_REFRESH_TOKEN = "refresh_token"
 const GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 
-type TokenRequest struct {
-	// ClientId bson.ObjectID `json:"client_id" validate:"required"`
-	GrantType string 	`json:"grant_type" validate:"required"`
-}
 
 func TokenHandler(w http.ResponseWriter, r *http.Request) {
 	
-	var tokenRequest TokenRequest 
+	var tokenRequest customtype.TokenRequest 
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {

@@ -2,10 +2,11 @@ package middleware
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/tanjed/go-sso/internal/handler/customtype"
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/jwtmanager"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
@@ -14,29 +15,30 @@ import (
 
 func ValidateToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func (w http.ResponseWriter, r *http.Request)  {
+
 		token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", -1)
 		if len(token) <= 0 {
-			responsemanager.ResponseUnAuthorized(&w, "Token not provided")
+			responsemanager.ResponseUnAuthorized(&w, customtype.M{"message" : "token not found"})
 			return
 		}
-		parsedToken := jwtmanager.ParseToken(token)
-		user, err := jwtmanager.VerifyJwtToken(parsedToken, parsedToken.TokenType)
+
+		claims, parsedToken, err := jwtmanager.ParseToken(token)
+
+		if err != nil {
+			slog.Error("uable to parse access token", "error", err )
+			responsemanager.ResponseUnAuthorized(&w,  customtype.M{"message" : "uable to parse access token"})
+			return
+		}
+
+		user, err := jwtmanager.VerifyJwtToken(claims, parsedToken)
 		
 		if err != nil {
-			fmt.Println(err)
-			responsemanager.ResponseUnAuthorized(&w, "Invalid token provided")
+			slog.Error("Token Err:", "error", err.Error())
+			responsemanager.ResponseUnAuthorized(&w,  customtype.M{"message" : err.Error()})
 			return
 		}
 
-		var ctx context.Context
-
-		if parsedClient, ok := user.(*model.Client); ok{
-			ctx = context.WithValue(r.Context(), model.AUTH_USER_CONTEXT_KEY, parsedClient)
-		}
-
-		if parsedUser, ok := user.(*model.User); ok{
-			ctx = context.WithValue(r.Context(), model.AUTH_USER_CONTEXT_KEY, parsedUser)
-		}
+		ctx := context.WithValue(r.Context(), model.AUTH_USER_CONTEXT_KEY, user)
 		
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

@@ -12,6 +12,7 @@ import (
 	"github.com/tanjed/go-sso/internal/db/redisdb"
 	"github.com/tanjed/go-sso/pkg/hashutilities"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 const TIME_FORMAT = "2006-01-02 15:04:05.0000"
@@ -83,19 +84,22 @@ func (c *Client) Insert() bool {
 
 
 func AuthenticateClient(clientId bson.ObjectID, clientSecret string) (*Client, error)  {
-	c, _ := GetClientById(clientId)
-	
-	if c == nil {
-		return nil, &ClientNotFoundError{
-			Message: "Client not found",
-			Code: http.StatusNotFound,
-		}
-	}
+	c, err := GetClientById(clientId)
 
-	client := *c
-	if !hashutilities.CompareHashWithString(client.ClientSecret, clientSecret) {
-		return nil, &ClientNotFoundError{
-			Message: "Client unauthorized",
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, &ClientNotFoundError{
+				Message: "client not found",
+				Code: http.StatusNotFound,
+			}
+		}
+		return nil, err
+	}
+	
+	
+	if !hashutilities.CompareHashWithString(c.ClientSecret, clientSecret) {
+		return nil, &ClientUnAuthorizedError{
+			Message: "password mismatched",
 			Code: http.StatusUnauthorized,
 		}
 	}

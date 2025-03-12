@@ -1,20 +1,33 @@
 package oauthservice
 
 import (
+	"log/slog"
+
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/jwtmanager"
 )
 
 
-func GetNewAccessToken(c chan TokenResponse, requiredCalims *RequiredClaims) {
-	accessTokenClaims := jwtmanager.NewJwtClaims(requiredCalims.ClientId,
-			&requiredCalims.UserId, requiredCalims.Scope, model.TOKEN_TYPE_USER_ACCESS_TOKEN)
+func GetOAuthToken(c chan TokenResponse, tokenType string, requiredCalims *RequiredClaims) {
+	claims := jwtmanager.NewJwtClaims(requiredCalims.ClientId, requiredCalims.UserId, requiredCalims.Scope, tokenType)
+	oauthTokenPayload := model.NewOauthToken(claims.ClientId, claims.UserId, claims.Scopes, claims.TokenType, claims.ExpAt, claims.IssAt)
 
-			accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
+	tokenId, err := oauthTokenPayload.Insert();
+	claims.TokenId = tokenId
 
-		c	<- TokenResponse{
-			Token: accessToken,
-			Claim: *accessTokenClaims,
+	if err != nil {
+		slog.Error("Unable to store JWT", "error", err)
+		c <- TokenResponse{
 			Err: err,
 		}
+		return 
+	}
+
+	accessToken, err := jwtmanager.NewJwtToken(claims)
+		
+	c	<- TokenResponse{
+		Token: accessToken,
+		Claim: *claims,
+		Err: err,
+	}
 }

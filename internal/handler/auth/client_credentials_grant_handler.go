@@ -1,99 +1,61 @@
 package auth
 
 import (
-	"encoding/json"
-	"log/slog"
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/tanjed/go-sso/internal/customerror"
+	"github.com/tanjed/go-sso/internal/handler/customtype"
 	"github.com/tanjed/go-sso/internal/model"
-	"github.com/tanjed/go-sso/pkg/jwtmanager"
+	"github.com/tanjed/go-sso/internal/pkg/oauthservice"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-type ClientCredentialsGrantRequest struct {
-	TokenRequest
-	ClientId bson.ObjectID 	`json:"client_id" validate:"required"`
-	ClientSecret string `json:"client_secret" validate:"required"`
-	Scope []string 		`json:"scope" validate:"required"`
-}
 
 func clientCredentialsGrantHandler(w http.ResponseWriter, r *http.Request) {
-	var clientCredentialsGrantRequest ClientCredentialsGrantRequest
-	err := json.NewDecoder(r.Body).Decode(&clientCredentialsGrantRequest); 
-	
-	if err != nil {
-		slog.Error("Unable to process the request", "error", err)
-		responsemanager.ResponseUnprocessableEntity(&w, "Unable to process the request")
+	var clientCredentialsGrantRequest customtype.ClientCredentialsGrantRequest
+
+	if err := clientCredentialsGrantRequest.Validated(r.Body); err != nil {
+		responsemanager.ResponseUnprocessableEntity(&w, customtype.I{
+			"message" : err.Error(),
+			"bag" : err.(*customerror.ValidationError).ErrBag,
+		})
         return
 	}
-
-	validate := validator.New()
-	err = validate.Struct(clientCredentialsGrantRequest)
-
-	if err != nil {
-		if errors, ok := err.(validator.ValidationErrors); ok {
-			responsemanager.ResponseValidationError(&w, errors)
-		} else {
-			slog.Error("Unable to process the request", "error", err)
-			responsemanager.ResponseUnprocessableEntity(&w, "Unable to process the request")
-		}
-		return
-    }
 	
 	client, err := model.AuthenticateClient(clientCredentialsGrantRequest.ClientId, clientCredentialsGrantRequest.ClientSecret);
 	if err != nil {
-		responsemanager.ResponseUnAuthorized(&w, "Invalid client credentials")
+		switch err.(type) {
+		case model.ClientNotFoundError :
+			responsemanager.ResponseUnAuthorized(&w, customtype.M{"message" : "invalid client credentials"})
+		default:
+			responsemanager.ResponseServerError(&w, customtype.M{"message" : "something went wrong"})
+		}
 		return
 	}
 
-	type tokenResponse struct {
-		Token string
-		Claim jwtmanager.CustomClaims
-		Err error
+	
+	accessTokenChan := make(chan oauthservice.TokenResponse)
+	refreshTokenChan := make(chan oauthservice.TokenResponse)
+	requiredClaims := oauthservice.RequiredClaims{
+		UserId: nil,
+		ClientId: client.ClientId,
+		Scope: clientCredentialsGrantRequest.Scope,
 	}
 
-	accessTokenChan := make(chan tokenResponse)
-	refreshTokenChan := make(chan tokenResponse)
+	go oauthservice.GetOAuthToken(accessTokenChan, model.TOKEN_TYPE_USER_ACCESS_TOKEN, &requiredClaims)
+	go oauthservice.GetOAuthToken(refreshTokenChan, model.TOKEN_TYPE_USER_REFRESH_TOKEN, &requiredClaims)
 
-	go func ()  {
-		accessTokenClaims := jwtmanager.NewJwtClaims(client.ClientId,
-			nil, clientCredentialsGrantRequest.Scope, model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN)
-
-			accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
-
-		accessTokenChan	<- tokenResponse{
-			Token: accessToken,
-			Claim: *accessTokenClaims,
-			Err: err,
-		}
-	}()
-
-
-	go func ()  {
-		refreshTokenClaims := jwtmanager.NewJwtClaims(client.ClientId,
-			nil, clientCredentialsGrantRequest.Scope, model.TOKEN_TYPE_CLIENT_REFRESH_TOKEN)
-
-		refreshToken, err := jwtmanager.NewJwtToken(refreshTokenClaims)		
-
-		refreshTokenChan <- tokenResponse{
-			Token:  refreshToken,
-			Claim: *refreshTokenClaims,
-			Err: err,
-		}
-	}()
 	
 	accessTokenResp := <-accessTokenChan
 	refreshTokenResp := <-refreshTokenChan
 
 	if accessTokenResp.Err != nil || refreshTokenResp.Err != nil  {
-		responsemanager.ResponseServerError(&w, "Unable to generate access token")
+		responsemanager.ResponseServerError(&w, customtype.M{"message" : "unable to generate access token"})
 		return
 	}
 
 
-	responsemanager.ResponseOK(&w, map[string]interface{}{
+	responsemanager.ResponseOK(&w, customtype.I{
 		"access_token" : accessTokenResp.Token,
 		"refresh_token" : refreshTokenResp.Token,
 		"access_token_expired_at" : accessTokenResp.Claim.ExpiresAt,

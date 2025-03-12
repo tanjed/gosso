@@ -3,25 +3,26 @@ package profile
 import (
 	"net/http"
 
+	"github.com/tanjed/go-sso/internal/handler/customtype"
 	"github.com/tanjed/go-sso/internal/model"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
 )
 
 func UserProfileHandler(w http.ResponseWriter, r *http.Request) {
-	authUser := r.Context().Value(model.AUTH_USER_CONTEXT_KEY);
-	var responsePayload map[string]interface{}
-	if client, ok := authUser.(*model.Client); ok {
-		responsePayload = map[string]interface{}{
-			"client_id" : client.ClientId,
-		}
-	} 
+	user := r.Context().Value(model.AUTH_USER_CONTEXT_KEY);
+	
+	if _, ok:= user.(model.Client); ok {
+		responsemanager.ResponseUnprocessableEntity(&w, customtype.M{"message" : "client does not have this permission"})
+		return
+	}
 
-	if user, ok := authUser.(*model.User); ok {
-		responsePayload = map[string]interface{}{
-			"first_name" : user.FirstName,
-			"last_name" : user.LastName,
-			"mobile_number" : user.MobileNumber,
-		}
-	} 
-	responsemanager.ResponseOK(&w, responsePayload)
+	responsemanager.ResponseOK(&w, customtype.M{
+		"first_name" : user.(*model.User).FirstName,
+		"last_name" : user.(*model.User).LastName,
+		"mobile_number" : user.(*model.User).MobileNumber,
+		"email" : user.(*model.User).Email,
+		"address" : *user.(*model.User).Address,
+		"nid" : *user.(*model.User).Nid,
+		"passport" : *user.(*model.User).Passport,
+	})
 }

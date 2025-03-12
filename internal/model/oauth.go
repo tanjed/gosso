@@ -18,7 +18,7 @@ type OauthToken struct {
 	TokenId bson.ObjectID `bson:"_id"`
 	ClientId bson.ObjectID `bson:"client_id"`
 	UserId bson.ObjectID `bson:"user_id"`
-	Scopes []string `bson:"scopes"`
+	Scope []string `bson:"scope"`
 	Revoked int `bson:"revoked"`
 	TokenType string `bson:"string"`
 	ExpiredAt time.Time `bson:"expired_at"`
@@ -36,7 +36,7 @@ func NewOauthToken(clientId bson.ObjectID, userId bson.ObjectID, scopes []string
 		TokenId: bson.NewObjectID(),
 		ClientId: clientId,
 		UserId: userId,
-		Scopes: scopes,
+		Scope: scopes,
 		Revoked: 0,
 		TokenType: tokenType,
 		ExpiredAt: expiredAt,
@@ -46,7 +46,7 @@ func NewOauthToken(clientId bson.ObjectID, userId bson.ObjectID, scopes []string
 }
 
 
-func (t *OauthToken) Insert() bool {
+func (t *OauthToken) Insert() (bson.ObjectID, error) {
 	app := apiservice.GetApp()
 	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
@@ -56,10 +56,10 @@ func (t *OauthToken) Insert() bool {
 
 	if err != nil {
 		slog.Error("Unable to store JWT", "error", err)
-		return false
+		return bson.NilObjectID, err
 	}
 
-	return res.Acknowledged
+	return res.InsertedID.(bson.ObjectID), nil
 }
 
 func (t *OauthToken) InvokeToken() bool{
@@ -67,20 +67,19 @@ func (t *OauthToken) InvokeToken() bool{
 	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(TOKEN_COLLECTION_NAME)
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
-	res, err := collection.UpdateOne(ctx, bson.D{{"token_id", t.TokenId}}, bson.D{
-			{"$set", bson.D{{"revoked", 1}, {"updated_at", time.Now()}},
-		},
-	})
+	res, err := collection.UpdateOne(ctx, bson.M{"_id": t.TokenId}, bson.M{
+			"$set" : bson.M{"revoked": 1, "updated_at": time.Now()},
+		})
 
 	if err != nil {
-		slog.Error("Unable to invoke token", "error", err)
+		slog.Error("unable to invoke token", "error", err)
 		return false
 	}
 
-	return res.Acknowledged
+	return res.ModifiedCount > 0
 }
 
-func GetOAuthTokenById(tokenId bson.ObjectID) *OauthToken{
+func GetOAuthTokenById(tokenId bson.ObjectID) (*OauthToken, error){
 	app := apiservice.GetApp()
 	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
 	defer cancel()
@@ -89,10 +88,10 @@ func GetOAuthTokenById(tokenId bson.ObjectID) *OauthToken{
 	err := collection.FindOne(ctx, bson.M{"_id": tokenId}).Decode(&token)
 
 	if err != nil {
-		slog.Error("Unable to get token", "error", err)
-		return nil
+		slog.Error("unable to get token", "error", err)
+		return nil, err
 	}
-	return &token
+	return &token, nil
 }
 
 

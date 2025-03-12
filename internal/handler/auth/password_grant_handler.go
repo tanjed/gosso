@@ -35,23 +35,22 @@ func passwordGrantHandler(w http.ResponseWriter, r *http.Request) {
 
 	accessTokenChan := make(chan oauthservice.TokenResponse)
 	refreshTokenChan := make(chan oauthservice.TokenResponse)
-	requriedClaims := oauthservice.RequiredClaims{
-		UserId: user.UserId,
+	requiredClaims := oauthservice.RequiredClaims{
+		UserId: &user.UserId,
 		ClientId: passwordGrantRequest.ClientId,
 		Scope: passwordGrantRequest.Scope, 
 	}
 
-	go oauthservice.GetNewAccessToken(accessTokenChan, &requriedClaims)
-	go oauthservice.GetNewRefreshToken(refreshTokenChan, &requriedClaims)
+	go oauthservice.GetOAuthToken(accessTokenChan, model.TOKEN_TYPE_USER_ACCESS_TOKEN, &requiredClaims)
+	go oauthservice.GetOAuthToken(refreshTokenChan, model.TOKEN_TYPE_USER_REFRESH_TOKEN, &requiredClaims)
 	
 	accessTokenResp := <-accessTokenChan
 	refreshTokenResp := <-refreshTokenChan
 
 	if accessTokenResp.Err != nil || refreshTokenResp.Err != nil  {
-		responsemanager.ResponseServerError(&w, customtype.I{"message" : "Unable to generate access token"})
+		responsemanager.ResponseServerError(&w, customtype.I{"message" : "unable to generate token"})
 		return
 	}
-
 
 	responsemanager.ResponseOK(&w, customtype.I{
 		"access_token" : accessTokenResp.Token,

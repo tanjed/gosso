@@ -10,6 +10,10 @@ import (
 type M map[string]string
 type I map[string]interface{}
 
+type TokenRequest struct {
+	// ClientId bson.ObjectID `json:"client_id" validate:"required"`
+	GrantType string 	`json:"grant_type" validate:"required"`
+}
 type UserRegisterRequest struct {
 	ClientId bson.ObjectID `json:"client_id" validate:"required"`
 	FirstName string `json:"first_name" validate:"required"`
@@ -37,3 +41,27 @@ type PasswordGrantRequest struct {
 func(r *PasswordGrantRequest) Validated(d io.Reader) error {
 	return request.GetValidated(d, r)
 }
+
+
+type ClientCredentialsGrantRequest struct {
+	TokenRequest
+	ClientId bson.ObjectID 	`json:"client_id" validate:"required"`
+	ClientSecret string `json:"client_secret" validate:"required"`
+	Scope []string 		`json:"scope" validate:"required"`
+}
+
+
+func(r *ClientCredentialsGrantRequest) Validated(d io.Reader) error {
+	return request.GetValidated(d, r)
+}
+
+
+type RefreshTokenRequest struct {
+	TokenRequest
+	AccessToken string `json:"access_token" validate:"required"`
+}
+
+func(r *RefreshTokenRequest) Validated(d io.Reader) error {
+	return request.GetValidated(d, r)
+}
+

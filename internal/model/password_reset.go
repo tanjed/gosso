@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -107,7 +106,7 @@ func (p *PasswordReset) MarkAsValidated() bool {
 	defer cancel()
 
 	collection := app.DB.Conn.Database(app.Config.DB_NAME).Collection(RESET_PASSWORD_COLLECTION_NAME)
-	fmt.Println(p.ResetId)
+	
 	res, err := collection.UpdateOne(ctx, bson.D{
 		{Key:"reset_id",  Value:p.ResetId},
 	}, bson.D{

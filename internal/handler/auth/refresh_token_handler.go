@@ -1,71 +1,78 @@
 package auth
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/tanjed/go-sso/internal/customerror"
+	"github.com/tanjed/go-sso/internal/handler/customtype"
 	"github.com/tanjed/go-sso/internal/model"
+	"github.com/tanjed/go-sso/internal/pkg/oauthservice"
 	"github.com/tanjed/go-sso/pkg/jwtmanager"
 	"github.com/tanjed/go-sso/pkg/responsemanager"
 )
 
-type RefreshTokenRequest struct {
-	TokenRequest
-	AccessToken string `json:"access_token" validate:"required"`
-}
 
 func refreshTokenGrantHandler(w http.ResponseWriter, r *http.Request) {
-	var refreshTokenRequest RefreshTokenRequest
+	var refreshTokenRequest customtype.RefreshTokenRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&refreshTokenRequest); err != nil {
-		slog.Error("Unable to process the request", "error", err)
-		responsemanager.ResponseUnprocessableEntity(&w, "Unable to process the request")
+	if err := refreshTokenRequest.Validated(r.Body); err != nil {
+		responsemanager.ResponseUnprocessableEntity(&w, customtype.I{
+			"message" : err.Error(),
+			"bag" : err.(*customerror.ValidationError).ErrBag,
+		})
         return
 	}
-
-	validate := validator.New()
-
-	if err := validate.Struct(refreshTokenRequest); err != nil {
-		if errors, ok := err.(validator.ValidationErrors); ok {
-			responsemanager.ResponseValidationError(&w, errors)
-		} else {
-			slog.Error("Unable to process the request", "error", err)
-			responsemanager.ResponseUnprocessableEntity(&w, "Unable to process the request")
-		}
-		return
-    }
 	
-	parsedToken := jwtmanager.ParseToken(refreshTokenRequest.AccessToken)
+	claims, parsedToken, err := jwtmanager.ParseToken(refreshTokenRequest.AccessToken)
 
-	if parsedToken == nil {
-		slog.Error("Uable to parse access token")
-		responsemanager.ResponseUnprocessableEntity(&w, "Uable to parse access token")
+	if err != nil {
+		slog.Error("uable to parse access token", "error", err )
+		responsemanager.ResponseUnAuthorized(&w, "uable to parse access token")
 		return
 	}
 
-
-	oAuthToken := model.GetOAuthTokenById(parsedToken.TokenId)
-
-	if oAuthToken == nil {
-		slog.Error("Invalid token provided")
-		responsemanager.ResponseUnprocessableEntity(&w, "Invalid token provided")
+	if !parsedToken.Valid {
+		responsemanager.ResponseUnAuthorized(&w, customtype.M{"message" : "invalid refresh token"})
 		return
 	}
 
-	accessTokenClaims := jwtmanager.NewJwtClaims(oAuthToken.ClientId,
-			&oAuthToken.UserId, oAuthToken.Scopes, parsedToken.TokenType)
+	token, err := model.GetOAuthTokenById(claims.TokenId)
 
-	accessToken, err := jwtmanager.NewJwtToken(accessTokenClaims)
-
-	if err != nil  {
-		responsemanager.ResponseServerError(&w, "Unable to generate access token")
+	if err != nil || token.Revoked == 1 {
+		slog.Error("invalid token provided", "error", err)
+		responsemanager.ResponseUnAuthorized(&w, customtype.M{"message" : "invalid refresh token"})
 		return
 	}
 
-	responsemanager.ResponseOK(&w, map[string]interface{}{
-		"access_token" : accessToken,
-		"access_token_expired_at" : accessTokenClaims.ExpiresAt,
+	if isInvoked := token.InvokeToken(); !isInvoked {
+		responsemanager.ResponseUnAuthorized(&w, customtype.M{"message" : "unable to process refresh token"})
+		return
+	}
+
+	accessTokenChan := make(chan oauthservice.TokenResponse)
+	refreshTokenChan := make(chan oauthservice.TokenResponse)
+	requiredClaims := oauthservice.RequiredClaims{
+		UserId: &token.UserId,
+		ClientId: token.ClientId,
+		Scope: token.Scope, 
+	}
+
+	go oauthservice.GetOAuthToken(accessTokenChan, model.TOKEN_TYPE_USER_ACCESS_TOKEN, &requiredClaims)
+	go oauthservice.GetOAuthToken(refreshTokenChan, model.TOKEN_TYPE_USER_REFRESH_TOKEN, &requiredClaims)
+
+	accessTokenResp := <-accessTokenChan
+	refreshTokenResp := <-refreshTokenChan
+
+	if accessTokenResp.Err != nil || refreshTokenResp.Err != nil  {
+		responsemanager.ResponseServerError(&w, customtype.I{"message" : "unable to generate token"})
+		return
+	}
+
+	responsemanager.ResponseOK(&w, customtype.I{
+		"access_token" : accessTokenResp.Token,
+		"refresh_token" : refreshTokenResp.Token,
+		"access_token_expired_at" : accessTokenResp.Claim.ExpiresAt,
+		"refresh_token_expired_at" : refreshTokenResp.Claim.ExpiresAt,
 	})
 }

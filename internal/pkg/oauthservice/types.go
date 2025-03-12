@@ -12,7 +12,7 @@ type TokenResponse struct {
 }
 
 type RequiredClaims struct {
-	UserId bson.ObjectID
+	UserId *bson.ObjectID
 	ClientId bson.ObjectID
 	Scope []string
 }

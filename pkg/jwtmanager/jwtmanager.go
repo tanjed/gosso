@@ -1,9 +1,9 @@
 package jwtmanager
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -54,7 +54,6 @@ func NewJwtClaims(clientId bson.ObjectID, userId *bson.ObjectID, scopes []string
 	}
 
 	return &CustomClaims{
-		TokenId: bson.NewObjectID(),
 		ClientId: clientId,
 		UserId: *userId,
 		Scopes: scopes,
@@ -78,45 +77,38 @@ func NewJwtToken(claims *CustomClaims) (string, error){
 		return "", err
 	}
 
-
-	oauthTokenPayload := model.NewOauthToken(claims.ClientId, claims.UserId, claims.Scopes, claims.TokenType, claims.ExpAt, claims.IssAt)
-
-	if !oauthTokenPayload.Insert() {
-		slog.Error("Unable to store JWT", "error", err)
-		return "", errors.New("unable to store jwt")
-	}
-
 	return token, nil
 }
 
-func ParseToken(tokenStr string) *CustomClaims {
+func ParseToken(tokenStr string)(*CustomClaims, *jwt.Token, error) {
 	var customClaims CustomClaims
 	app := apiservice.GetApp()
-	token, err := jwt.ParseWithClaims(tokenStr, &customClaims, func(token *jwt.Token) (interface{}, error) {
+	t, err := jwt.ParseWithClaims(tokenStr, &customClaims, func(token *jwt.Token) (interface{}, error) {
         return []byte(app.Config.JWT_SECRET), nil
     })
 	
 	if err != nil{
-		return nil
-	}
-	
-	if !token.Valid {
-		return nil
-	}
-	return &customClaims
-}
-
-func VerifyJwtToken(token *CustomClaims, tokenType string) (model.UserableInterface, error) {	
-	
-	if !helpers.ContainsInSlice(tokenType, []string{ 
-		model.TOKEN_TYPE_USER_ACCESS_TOKEN,  
-		model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN})  {
-		return nil, &InvalidTokenException{
-			Message: "invalid token provided",
-			Code: 403,
+		return nil, nil, &InvalidTokenException{
+			Message: "invalid token",
+			Code: http.StatusUnprocessableEntity,
 		}
 	}
-	user, err := validateCustomClaims(token)
+	
+	return &customClaims, t, nil
+}
+
+func VerifyJwtToken(claims *CustomClaims, token *jwt.Token) (model.UserableInterface, error) {	
+	
+	if !helpers.ContainsInSlice(claims.TokenType, []string{ 
+		model.TOKEN_TYPE_USER_ACCESS_TOKEN,  
+		model.TOKEN_TYPE_CLIENT_ACCESS_TOKEN}) || !token.Valid  {
+		return nil, &InvalidTokenException{
+			Message: "invalid token provided",
+			Code: http.StatusUnauthorized,
+		}
+	}
+
+	user, err := validateCustomClaims(claims)
 
 	if err != nil {
 		return nil, err
@@ -127,31 +119,41 @@ func VerifyJwtToken(token *CustomClaims, tokenType string) (model.UserableInterf
 
 func validateCustomClaims(claims *CustomClaims) (*model.UserableInterface, error) {
     
-    oAuthToken := model.GetOAuthTokenById(claims.TokenId)
-    if oAuthToken == nil {
-        return nil, errors.New("token not found")
+    token, err := model.GetOAuthTokenById(claims.TokenId)
+    if err != nil {
+        return nil, &InvalidTokenException{
+			Message: "invalid token provided",
+			Code: http.StatusUnauthorized,
+		}
     }
 
 	location, _ := time.LoadLocation("Asia/Dhaka")
-	if oAuthToken.ExpiredAt.In(location).Before(time.Now().In(location)) {
+	if token.ExpiredAt.In(location).Before(time.Now().In(location)) {
 		return nil, &TokenExpiredException{
-			Message: "Token Expired",
-			Code: 403,
+			Message: "token expired",
+			Code: http.StatusUnauthorized,
 		}
 	}	
 
-	if oAuthToken.Revoked == 1 {
+	if token.Revoked == 1 {
 		return nil, &TokenExpiredException{
-			Message: "Token Expired",
-			Code: 403,
+			Message: "token expired",
+			Code: http.StatusUnauthorized,
 		}
 	}
 	
 	var user model.UserableInterface
-	if oAuthToken.TokenType == model.TOKEN_TYPE_USER_ACCESS_TOKEN {
-		user = model.GetUserById(oAuthToken.UserId)		
+	if token.TokenType == model.TOKEN_TYPE_USER_ACCESS_TOKEN {
+		user, err = model.GetUserById(token.UserId)		
 	} else {
-		user, _ = model.GetClientById(oAuthToken.ClientId)		
+		user, err = model.GetClientById(token.ClientId)		
+	}
+
+	if err != nil {
+		return nil, &InvalidTokenException{
+			Message: "invalid token",
+			Code: http.StatusUnauthorized,
+		}
 	}
 
     return &user, nil
